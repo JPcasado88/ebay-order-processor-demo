@@ -100,7 +100,12 @@
     </div>
     <div class="container">
         <div class="header d-flex justify-content-between align-items-center">
-            <h3 class="text-muted">eBay Order Processor</h3>
+            <div>
+                <h3 class="text-muted">eBay Order Processor</h3>
+                {% if config.get('DEMO_MODE') %}
+                    <span class="badge bg-warning text-dark fs-6">🎪 DEMO MODE - Sample Data Only</span>
+                {% endif %}
+            </div>
         </div>
         
         {% for category, message in get_flashed_messages(with_categories=true) %}

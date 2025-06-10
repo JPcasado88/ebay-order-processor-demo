@@ -23,7 +23,60 @@ from ebaysdk.trading import Connection as Trading
 from ..core.exceptions import EbayApiError, TokenRefreshError
 from ..utils.date_utils import parse_ebay_datetime
 
+# Demo mode support
+from .demo_data import DemoDataService
+
 logger = logging.getLogger(__name__)
+
+# --- Demo Mode Functions ---
+
+def get_demo_orders(store_name: str, from_date: datetime, to_date: datetime) -> List[Dict[str, Any]]:
+    """
+    Returns demo orders for the specified store and date range.
+    This function is used when DEMO_MODE is enabled.
+    """
+    logger.info(f"[DEMO MODE] Getting demo orders for store '{store_name}' from {from_date} to {to_date}")
+    
+    demo_service = DemoDataService()
+    
+    # Calculate days back from to_date for filtering
+    days_back = (to_date - from_date).days + 1
+    
+    # Get demo orders for this store
+    demo_orders = demo_service.get_sample_orders(store_name, days_back)
+    
+    # Convert to eBay-like order format for compatibility
+    converted_orders = []
+    for order in demo_orders:
+        converted_order = {
+            'OrderID': order['OrderID'],
+            'CreatedTime': order['CreatedTime'],
+            'OrderTotal': order['OrderTotal'],
+            'BuyerUserID': order['BuyerName'].replace(' ', '').lower(),
+            'ShippingAddress': order['BuyerAddress'],
+            'TransactionArray': {
+                'Transaction': []
+            }
+        }
+        
+        # Convert items to eBay transaction format
+        for item in order['Items']:
+            transaction = {
+                'Item': {
+                    'ItemID': item['ItemID'],
+                    'Title': item['Title'],
+                    'SKU': item['SKU']
+                },
+                'TransactionID': f"{item['ItemID']}-001",
+                'QuantityPurchased': item['Quantity'],
+                'TransactionPrice': item['Price']
+            }
+            converted_order['TransactionArray']['Transaction'].append(transaction)
+        
+        converted_orders.append(converted_order)
+    
+    logger.info(f"[DEMO MODE] Returning {len(converted_orders)} demo orders for store '{store_name}'")
+    return converted_orders
 
 # --- Gestión de Tokens ---
 

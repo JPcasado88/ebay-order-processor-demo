@@ -200,6 +200,11 @@ class OrderProcessingService:
         store_id = store_account['account_id']
         access_token = store_account.get('access_token')
         
+        # Check if we're in demo mode
+        if self.config.get('DEMO_MODE', False):
+            logger.info(f"[DEMO MODE] Processing store: {store_id}")
+            return self._process_single_store_demo(store_account, matlist_df, form_data)
+        
         if not access_token:
             logger.error(f"La tienda {store_id} no tiene token de acceso. Omitiendo.")
             return {'expedited': [], 'standard': [], 'unmatched': []}
@@ -273,6 +278,147 @@ class OrderProcessingService:
         expedited, standard = self._categorize_orders(all_processed_items, order_item_counts)
         
         return {'expedited': expedited, 'standard': standard, 'unmatched': unmatched_items}
+
+    def _process_single_store_demo(self, store_account: Dict, matlist_df: pd.DataFrame, form_data: Dict) -> Dict[str, List]:
+        """
+        Demo mode version of _process_single_store that uses mock data instead of real eBay API calls.
+        This preserves all the processing logic while using demo data.
+        """
+        store_id = store_account['account_id']
+        logger.info(f"[DEMO MODE] Processing demo data for store: {store_id}")
+        
+        from_date = datetime.fromisoformat(self.process_info['from_dt_iso'])
+        to_date = datetime.now(timezone.utc)
+        
+        # Update store progress during mock API call
+        self._update_store_progress(store_id, 'processing', '[DEMO] Obteniendo pedidos de eBay...', orders_found=0)
+        
+        # Get demo orders instead of real API call
+        raw_orders = ebay_api.get_demo_orders(store_id, from_date, to_date)
+        
+        # Convert demo orders to the same format as real eBay orders for processing
+        demo_orders = self._convert_demo_orders_to_ebay_format(raw_orders)
+        
+        self._update_store_progress(store_id, 'processing', f'[DEMO] Procesando {len(demo_orders)} pedidos...', orders_found=len(demo_orders))
+
+        all_processed_items, unmatched_items = [], []
+        order_item_counts = {}
+
+        logger.info(f"[DEMO MODE] [{store_id}] Iniciando procesamiento de {len(demo_orders)} órdenes con filtros: include_all_orders={form_data.get('include_all_orders', False)}, next_24h_only={form_data.get('next_24h_only', False)}")
+        
+        processed_count = 0
+        skipped_dispatched = 0
+        skipped_not_urgent = 0
+        
+        for order in demo_orders:
+            order_id = getattr(order, 'OrderID', 'Unknown')
+            
+            # Apply the same filtering logic as real orders
+            if self._should_skip_order(order, form_data.get('include_all_orders', False)):
+                skipped_dispatched += 1
+                logger.debug(f"[DEMO MODE] [{store_id}] Orden {order_id} omitida: ya despachada")
+                continue
+            
+            if form_data.get('next_24h_only', False):
+                is_urgent = self._is_shipping_due(order)
+                logger.debug(f"[DEMO MODE] [{store_id}] Orden {order_id} es urgente: {is_urgent}")
+                if not is_urgent:
+                    skipped_not_urgent += 1
+                    logger.debug(f"[DEMO MODE] [{store_id}] Orden {order_id} omitida: no es urgente")
+                    continue
+
+            transactions = getattr(order.TransactionArray, 'Transaction', [])
+            if not isinstance(transactions, list):
+                transactions = [transactions]
+            
+            processed_count += 1
+            
+            for txn in transactions:
+                item_data = self._process_transaction(txn, order, matlist_df, store_id)
+                if item_data:
+                    all_processed_items.extend(item_data)
+                else:
+                    unmatched_items.append(self._create_unmatched_item(txn, order, store_id))
+        
+        logger.info(f"[DEMO MODE] [{store_id}] Resumen de filtrado: {processed_count} procesadas, {skipped_dispatched} omitidas (ya despachadas), {skipped_not_urgent} omitidas (no urgentes)")
+        
+        for item in all_processed_items:
+            order_id = item['ORDER ID']
+            order_item_counts[order_id] = order_item_counts.get(order_id, 0) + 1
+            
+        expedited, standard = self._categorize_orders(all_processed_items, order_item_counts)
+        
+        return {'expedited': expedited, 'standard': standard, 'unmatched': unmatched_items}
+
+    def _convert_demo_orders_to_ebay_format(self, demo_orders: List[Dict]) -> List:
+        """
+        Convert demo order dictionaries to mock eBay order objects for processing compatibility.
+        This creates objects that behave like eBay SDK objects but contain demo data.
+        """
+        from types import SimpleNamespace
+        
+        converted_orders = []
+        for demo_order in demo_orders:
+            # Create mock eBay order object
+            order = SimpleNamespace()
+            order.OrderID = demo_order['OrderID']
+            order.CreatedTime = demo_order['CreatedTime']
+            order.OrderTotal = demo_order['OrderTotal']
+            order.BuyerUserID = demo_order['BuyerUserID']
+            order.OrderStatus = 'Complete'
+            order.CheckoutStatus = SimpleNamespace()
+            order.CheckoutStatus.Status = 'Complete'
+            order.CheckoutStatus.eBayPaymentStatus = 'NoPaymentFailure'
+            order.PaymentHoldStatus = ''
+            order.ShippedTime = None  # Demo orders are not shipped yet
+            order.BuyerCheckoutMessage = 'Demo order for presentation purposes'
+            
+            # Create shipping address
+            addr_data = demo_order['ShippingAddress']
+            order.ShippingAddress = SimpleNamespace()
+            order.ShippingAddress.Name = addr_data['Name']
+            order.ShippingAddress.Street1 = addr_data['Street1']
+            order.ShippingAddress.Street2 = ''
+            order.ShippingAddress.CityName = addr_data['CityName']
+            order.ShippingAddress.PostalCode = addr_data['PostalCode']
+            order.ShippingAddress.Country = addr_data['Country']
+            order.ShippingAddress.Phone = '01234567890'
+            
+            # Create shipping service
+            order.ShippingServiceSelected = SimpleNamespace()
+            order.ShippingServiceSelected.ShippingService = 'Hermes'
+            order.ShippingServiceSelected.ShippingServiceCost = SimpleNamespace()
+            order.ShippingServiceSelected.ShippingServiceCost.value = '2.99'
+            
+            # Create buyer info
+            order.Buyer = SimpleNamespace()
+            order.Buyer.Email = f"{demo_order['BuyerUserID']}@demo-email.com"
+            
+            # Create transaction array
+            order.TransactionArray = SimpleNamespace()
+            transactions = []
+            
+            for item_data in demo_order['TransactionArray']['Transaction']:
+                txn = SimpleNamespace()
+                txn.TransactionID = item_data['TransactionID']
+                txn.QuantityPurchased = item_data['QuantityPurchased']
+                txn.TransactionPrice = item_data['TransactionPrice']
+                
+                # Create item
+                txn.Item = SimpleNamespace()
+                txn.Item.ItemID = item_data['Item']['ItemID']
+                txn.Item.Title = item_data['Item']['Title']
+                txn.Item.SKU = item_data['Item']['SKU']
+                
+                # No variation for demo orders (keep it simple)
+                txn.Variation = None
+                
+                transactions.append(txn)
+            
+            order.TransactionArray.Transaction = transactions
+            converted_orders.append(order)
+        
+        return converted_orders
 
     ### CAMBIO ###: Nuevas funciones de ayuda privadas para mantener el código limpio.
     def _process_transaction(self, txn: Any, order: Any, matlist_df: pd.DataFrame, store_id: str) -> Optional[List[Dict]]:
