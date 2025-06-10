@@ -10,13 +10,59 @@
                 <h5 class="card-title mb-0">Upload Tracking Data</h5>
             </div>
             <div class="card-body">
+                <div class="alert alert-info">
+                    <h6><i class="bi bi-info-circle"></i> How Tracking Upload Works</h6>
+                    <p class="mb-2">This system generates tracking files in <strong>Excel format</strong> (.xlsx) for internal use, but couriers typically provide tracking data in <strong>CSV format</strong>.</p>
+                    {% if config.get('DEMO_MODE') and suggested_csv %}
+                    <p class="mb-0">🎪 <strong>Demo Ready!</strong> We found a demo CSV file you can use: <code>{{ suggested_csv }}</code></p>
+                    {% else %}
+                    <p class="mb-0">💡 <strong>Demo Tip:</strong> When you process orders with tracking files enabled, the system also creates demo CSV files (ending with "_COURIER_UPLOAD_DEMO.csv") that you can use to test this upload functionality!</p>
+                    {% endif %}
+                </div>
+                
+                {% if config.get('DEMO_MODE') and demo_csv_files %}
+                <div class="alert alert-success">
+                    <h6><i class="bi bi-lightbulb"></i> Quick Demo Test</h6>
+                    <p class="mb-2">Perfect for recruiters! Here's how to demonstrate the complete tracking workflow:</p>
+                    <ol class="mb-0">
+                        <li>📁 <strong>Select the demo CSV below</strong> (it contains realistic tracking numbers)</li>
+                        <li>📝 <strong>Choose tracking files to update</strong> (we recommend "Update all")</li>
+                        <li>🚀 <strong>Click "Process"</strong> to see the Excel files get updated with tracking numbers</li>
+                        <li>📊 <strong>Download the updated files</strong> to see the tracking numbers populated</li>
+                    </ol>
+                </div>
+                {% endif %}
                 <p>Upload a CSV file containing tracking information to update the store shipping files.</p>
                 
                 <form action="{{ url_for('tracking.process_tracking_upload') }}" method="post" enctype="multipart/form-data" id="upload-form">
                     <div class="form-group mb-3">
                         <label for="tracking_file"><strong>Tracking CSV File:</strong></label>
+                        
+                        {% if config.get('DEMO_MODE') and demo_csv_files %}
+                        <div class="mb-2">
+                            <label class="form-label"><strong>Quick Demo Selection:</strong></label>
+                            <select class="form-select" id="demo_csv_select">
+                                <option value="">Select a demo CSV file...</option>
+                                {% for csv_file in demo_csv_files %}
+                                <option value="{{ csv_file }}" {% if csv_file == suggested_csv %}selected{% endif %}>
+                                    {{ csv_file }}
+                                    {% if 'CONSOLIDATED' in csv_file %} (Recommended){% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <small class="form-text text-muted">🎪 These CSV files contain realistic tracking numbers for demo purposes</small>
+                        </div>
+                        <div class="text-center mb-2">
+                            <strong>OR</strong>
+                        </div>
+                        {% endif %}
+                        
                         <input type="file" class="form-control" id="tracking_file" name="tracking_file" accept=".csv" required>
                         <small class="form-text text-muted">The CSV file should include 'Order number' and 'Consignment number' columns.</small>
+                        
+                        {% if config.get('DEMO_MODE') and demo_csv_files %}
+                        <input type="hidden" id="selected_demo_csv" name="selected_demo_csv" value="">
+                        {% endif %}
                     </div>
                     
                     <div class="form-group mb-4">
@@ -40,21 +86,32 @@
                         </div>
                     </div>
                     
-                    {% if store_files %}
+                    {% if existing_files %}
                     <div class="form-group mb-3" id="existing-files-section">
                         <label><strong>Store Files to Update:</strong></label>
                         <div class="form-check">
                             <input type="checkbox" id="update_all" name="update_all" class="form-check-input" checked>
-                            <label for="update_all" class="form-check-label">Update all available store files</label>
+                            <label for="update_all" class="form-check-label">
+                                <strong>Update all available store files</strong> 
+                                <small class="text-muted">({{ existing_files|length }} files detected)</small>
+                            </label>
                         </div>
                         
                         <div id="store-files-container" style="display: none; margin-top: 15px;">
-                            {% for file in store_files %}
+                            <small class="text-muted mb-2 d-block">Select specific files to update:</small>
+                            {% for file in existing_files %}
                             <div class="form-check">
-                                <input type="checkbox" id="file_{{ loop.index }}" name="selected_files" value="{{ file.name }}" class="form-check-input file-checkbox">
-                                <label for="file_{{ loop.index }}" class="form-check-label">{{ file.name }}</label>
+                                <input type="checkbox" id="file_{{ loop.index }}" name="selected_files" value="{{ file }}" class="form-check-input file-checkbox">
+                                <label for="file_{{ loop.index }}" class="form-check-label">{{ file }}</label>
                             </div>
                             {% endfor %}
+                        </div>
+                        
+                        <div id="update-all-preview" class="mt-2">
+                            <small class="text-success">
+                                <i class="bi bi-check-circle"></i> 
+                                All {{ existing_files|length }} tracking file(s) will be updated with tracking numbers
+                            </small>
                         </div>
                     </div>
                     {% else %}
@@ -82,19 +139,61 @@
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // Demo CSV selection handling
+        const demoCsvSelect = document.getElementById('demo_csv_select');
+        const trackingFileInput = document.getElementById('tracking_file');
+        const selectedDemoCsvInput = document.getElementById('selected_demo_csv');
+        
+        if (demoCsvSelect && trackingFileInput && selectedDemoCsvInput) {
+            demoCsvSelect.addEventListener('change', function() {
+                if (this.value) {
+                    // Demo CSV selected - disable file input and store selection
+                    trackingFileInput.required = false;
+                    trackingFileInput.disabled = true;
+                    selectedDemoCsvInput.value = this.value;
+                } else {
+                    // No demo CSV - enable file input
+                    trackingFileInput.required = true;
+                    trackingFileInput.disabled = false;
+                    selectedDemoCsvInput.value = '';
+                }
+            });
+            
+            // If there's a pre-selected demo CSV, trigger the change
+            if (demoCsvSelect.value) {
+                demoCsvSelect.dispatchEvent(new Event('change'));
+            }
+        }
+        
         const updateAllCheckbox = document.getElementById('update_all');
         const storeFilesContainer = document.getElementById('store-files-container');
         const fileCheckboxes = document.querySelectorAll('.file-checkbox');
+        const updateAllPreview = document.getElementById('update-all-preview');
         
         if (updateAllCheckbox && storeFilesContainer) {
             updateAllCheckbox.addEventListener('change', function() {
-                storeFilesContainer.style.display = this.checked ? 'none' : 'block';
-                
-                // Check/uncheck all file checkboxes based on the "Update All" checkbox
-                fileCheckboxes.forEach(checkbox => {
-                    checkbox.checked = this.checked;
-                });
+                if (this.checked) {
+                    // Hide individual file selection when "Update all" is checked
+                    storeFilesContainer.style.display = 'none';
+                    if (updateAllPreview) updateAllPreview.style.display = 'block';
+                    // Uncheck individual files to avoid confusion
+                    fileCheckboxes.forEach(checkbox => {
+                        checkbox.checked = false;
+                    });
+                } else {
+                    // Show individual file selection when "Update all" is unchecked
+                    storeFilesContainer.style.display = 'block';
+                    if (updateAllPreview) updateAllPreview.style.display = 'none';
+                }
             });
+            
+            // Initialize the state on page load
+            if (updateAllCheckbox.checked) {
+                storeFilesContainer.style.display = 'none';
+                if (updateAllPreview) updateAllPreview.style.display = 'block';
+            } else {
+                if (updateAllPreview) updateAllPreview.style.display = 'none';
+            }
         }
         
         // Manual upload toggle logic

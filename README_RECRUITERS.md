@@ -86,7 +86,19 @@ def start_background_process():
     # Real-time progress updates via file-based state
 ```
 
-### 4. **Dynamic File Generation**
+### 4. **Tracking Upload System**
+```python
+# Complete order fulfillment workflow
+def process_tracking_upload():
+    # Matches courier tracking data to internal order files
+    # Supports multiple file formats and encodings
+    # Batch processing with audit trail
+    # Smart barcode matching with error handling
+```
+
+**Business Value**: Completes the order-to-delivery lifecycle by connecting internal order management with external courier systems. Demonstrates complex data matching algorithms and file processing capabilities.
+
+### 5. **Dynamic File Generation**
 - Multiple Excel formats (RUN, COURIER_MASTER, Tracking)
 - ZIP file creation for batch processing
 - Template-based document generation
@@ -138,6 +150,9 @@ This project showcases the ability to:
 3. **Create production-ready applications** with proper architecture
 4. **Handle real-world business requirements** with sophisticated logic
 5. **Deploy scalable applications** to cloud platforms
+6. **Implement complete business workflows** from order to delivery tracking
+7. **Design data integration systems** that connect multiple external services
+8. **Build user-friendly interfaces** for complex business processes
 
 ---
 
@@ -156,4 +171,44 @@ The actual production version processes thousands of orders and generates compre
 
 ---
 
-*This is a demo version created specifically for recruiting purposes. All sensitive data has been sanitized or replaced with sample data.* 
+*This is a demo version created specifically for recruiting purposes. All sensitive data has been sanitized or replaced with sample data.*
+
+## 🔄 Complete Order Fulfillment Workflow
+
+This application demonstrates a **complete end-to-end order processing system** that handles the entire lifecycle from eBay order to customer delivery tracking:
+
+### **Phase 1: Order Processing** 📊
+- Fetches orders from eBay Trading API
+- Applies sophisticated SKU matching algorithms (19-case pattern recognition)
+- Generates multiple Excel files for different business purposes:
+  - **RUN files**: Internal picking and packing
+  - **Tracking files**: Customer service and logistics
+  - **Courier Master files**: Shipping label generation
+
+### **Phase 2: Logistics Integration** 📦
+- Tracking files contain internal barcodes (`Our_Barcode`) but no tracking numbers
+- Physical orders are shipped via courier companies
+- System generates demo CSV files showing expected courier data format
+
+### **Phase 3: Tracking Upload** 🔗
+- **Smart File Detection**: Automatically discovers generated tracking files
+- **Format Flexibility**: Accepts CSV uploads in multiple encodings (UTF-8, CP1252, Latin-1)
+- **Intelligent Matching**: Maps courier tracking numbers to internal barcodes
+- **Batch Processing**: Updates multiple tracking files simultaneously
+- **Audit Trail**: Creates versioned backup files with timestamps
+
+### **Phase 4: Complete Records** ✅
+- Excel tracking files now contain courier tracking numbers
+- Customer service can provide tracking information to customers
+- Complete order-to-delivery audit trail maintained
+
+### **Demo Workflow for Recruiters** 🎪
+```
+1. Process Demo Orders → Generates 8 sample orders across 3 stores
+2. Navigate to "Upload Tracking Data" → Auto-detects tracking files
+3. Select Demo CSV → Contains realistic tracking numbers
+4. Click "Process" → Updates 4 tracking numbers instantly
+5. Download Results → See completed tracking files
+```
+
+This demonstrates **real-world business process automation** and **complex data integration** skills essential for enterprise applications. 

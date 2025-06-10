@@ -96,13 +96,30 @@
                 <!-- Options Section -->
                 <div class="form-group">
                     <label>Options:</label>
+                    {% if config.get('DEMO_MODE') %}
+                    <div class="alert alert-info mb-3">
+                        <h6><i class="bi bi-lightbulb"></i> Demo Mode Tips</h6>
+                        <p class="mb-2"><strong>For best demo results:</strong></p>
+                        <ul class="mb-0">
+                            <li>✅ <strong>Uncheck</strong> "Get only orders to be dispatched in the next 24h" to see all demo orders</li>
+                            <li>✅ <strong>Check</strong> "Include Already Dispatched Orders" to include demo data</li>
+                            <li>💡 Demo orders are designed to showcase the SKU matching algorithm with realistic data</li>
+                        </ul>
+                    </div>
+                    {% endif %}
                     <div class="form-check">
-                        <input type="checkbox" id="next_24h_only" name="next_24h_only" class="form-check-input" checked>
+                        <input type="checkbox" id="next_24h_only" name="next_24h_only" class="form-check-input" {% if not config.get('DEMO_MODE') %}checked{% endif %}>
                         <label for="next_24h_only" class="form-check-label">Get only orders to be dispatched in the next 24h</label>
+                        {% if config.get('DEMO_MODE') %}
+                        <small class="form-text text-muted">⚠️ Demo orders don't have urgency data - uncheck this to see demo orders</small>
+                        {% endif %}
                     </div>
                     <div class="form-check">
-                        <input type="checkbox" id="include_all_orders" name="include_all_orders" class="form-check-input">
+                        <input type="checkbox" id="include_all_orders" name="include_all_orders" class="form-check-input" {% if config.get('DEMO_MODE') %}checked{% endif %}>
                         <label for="include_all_orders" class="form-check-label">Include Already Dispatched Orders</label>
+                        {% if config.get('DEMO_MODE') %}
+                        <small class="form-text text-muted">✅ Recommended for demo to include all sample orders</small>
+                        {% endif %}
                     </div>
                     <div class="form-check">
                         <input type="checkbox" id="recent_only" name="recent_only" class="form-check-input">

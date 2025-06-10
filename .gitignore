@@ -81,3 +81,10 @@ Thumbs.db
 
 # --- Railway Secrets ---
 .env.local
+
+# --- Test and Debug Files ---
+# Exclude temporary test files and debug scripts
+test_*.py
+debug_*.py
+data/processes/
+temp_*

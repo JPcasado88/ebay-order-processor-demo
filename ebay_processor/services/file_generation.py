@@ -13,6 +13,7 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 
 import openpyxl
+import pandas as pd
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
@@ -122,6 +123,7 @@ def generate_tracking_files(
 ) -> List[str]:
     """
     Genera múltiples archivos de Tracking: uno consolidado y uno por cada tienda.
+    También genera archivos CSV de demostración para pruebas de carga de tracking.
 
     Args:
         all_orders: Lista de todos los ítems procesados.
@@ -130,26 +132,30 @@ def generate_tracking_files(
         config: Diccionario de configuración de la app.
 
     Returns:
-        Una lista de rutas a los archivos de tracking generados.
+        Una lista de rutas a todos los archivos generados (Excel y CSV).
     """
     logger.info("Iniciando la generación de todos los archivos de Tracking.")
     generated_paths = []
 
     # 1. Generar archivo de tracking consolidado.
-    consolidated_path = _create_single_tracking_file(
+    consolidated_excel, consolidated_csv = _create_single_tracking_file_with_csv(
         all_orders, output_dir, run_date, config, is_consolidated=True
     )
-    if consolidated_path:
-        generated_paths.append(consolidated_path)
+    if consolidated_excel:
+        generated_paths.append(consolidated_excel)
+    if consolidated_csv:
+        generated_paths.append(consolidated_csv)
 
     # 2. Generar archivos de tracking por tienda.
     store_groups = _group_items_by_store_id(all_orders)
     for store_id, items in store_groups.items():
-        store_path = _create_single_tracking_file(
+        store_excel, store_csv = _create_single_tracking_file_with_csv(
             items, output_dir, run_date, config, is_consolidated=False, store_id=store_id
         )
-        if store_path:
-            generated_paths.append(store_path)
+        if store_excel:
+            generated_paths.append(store_excel)
+        if store_csv:
+            generated_paths.append(store_csv)
             
     return generated_paths
 
@@ -179,19 +185,22 @@ def generate_unmatched_items_file(
 
 # --- Funciones de Ayuda Privadas (Lógica de Formato y Guardado) ---
 
-def _create_single_tracking_file(
+def _create_single_tracking_file_with_csv(
     orders: List[Dict[str, Any]],
     output_dir: str,
     run_date: datetime,
     config: Dict,
     is_consolidated: bool,
     store_id: Optional[str] = None,
-) -> Optional[str]:
+) -> tuple[Optional[str], Optional[str]]:
     """
-    Función de ayuda interna para crear un único archivo de tracking.
+    Función de ayuda interna para crear archivos de tracking (Excel y CSV).
+    
+    Returns:
+        tuple: (excel_path, csv_path) - rutas a los archivos generados o None si no se crearon
     """
     if not orders:
-        return None
+        return None, None
 
     filename = _generate_filename("Tracking", store_id, run_date, consolidated=is_consolidated, config=config)
     order_groups = _group_items_by_order_id(orders)
@@ -204,8 +213,32 @@ def _create_single_tracking_file(
         rows.append(_format_tracking_row(representative_item, order_id))
     
     if rows:
-        return _save_excel_file(rows, output_dir, filename, TRACKING_SHEET_TITLE, config, has_info_header=True)
-    return None
+        excel_path = _save_excel_file(rows, output_dir, filename, TRACKING_SHEET_TITLE, config, has_info_header=True)
+        
+        # Also create a CSV version for courier upload simulation
+        csv_path = None
+        if excel_path:
+            csv_path = _save_tracking_csv_for_courier_upload(rows, output_dir, filename, run_date)
+        
+        return excel_path, csv_path
+    return None, None
+
+def _create_single_tracking_file(
+    orders: List[Dict[str, Any]],
+    output_dir: str,
+    run_date: datetime,
+    config: Dict,
+    is_consolidated: bool,
+    store_id: Optional[str] = None,
+) -> Optional[str]:
+    """
+    Función de ayuda interna para crear un único archivo de tracking (solo Excel).
+    Mantenida para compatibilidad con código existente.
+    """
+    excel_path, _ = _create_single_tracking_file_with_csv(
+        orders, output_dir, run_date, config, is_consolidated, store_id
+    )
+    return excel_path
 
 def _format_run_row(item: Dict[str, Any]) -> Dict[str, Any]:
     """Formatea un único ítem para una fila en un archivo RUN."""
@@ -332,6 +365,49 @@ def _shuffle_address(add1, add2, add3, add4) -> List[str]:
     """Mueve las partes de la dirección para rellenar huecos, asegurando 4 partes."""
     parts = [p for p in [add1, add2, add3, add4] if p and str(p).strip().lower() not in ('', 'n/a')]
     return (parts + [''] * 4)[:4]
+
+def _save_tracking_csv_for_courier_upload(rows: List[Dict], output_dir: str, excel_filename: str, run_date: datetime) -> Optional[str]:
+    """
+    Creates a CSV file that simulates courier tracking data for demo purposes.
+    This allows users to test the tracking upload functionality.
+    
+    Returns:
+        Path to the created CSV file, or None if no file was created.
+    """
+    logger.info(f"Starting CSV generation for {len(rows)} tracking rows")
+    try:
+        # Create a simplified CSV with courier format: Order Number, Consignment Number
+        courier_data = []
+        for i, row in enumerate(rows):
+            # Use Our_Barcode as Order Number and generate a fake tracking number
+            order_number = row.get('Our_Barcode', '')
+            logger.debug(f"Row {i}: Our_Barcode = '{order_number}'")
+            if order_number:
+                # Generate a realistic looking tracking number
+                tracking_number = f"HM{run_date.strftime('%y%m%d')}{str(hash(order_number))[-6:]}".upper()
+                courier_data.append({
+                    'Order Number': order_number,
+                    'Consignment Number': tracking_number
+                })
+        
+        logger.info(f"Generated {len(courier_data)} courier data entries")
+        
+        if courier_data:
+            # Create CSV filename based on Excel filename
+            csv_filename = excel_filename.replace('.xlsx', '_COURIER_UPLOAD_DEMO.csv')
+            csv_path = os.path.join(output_dir, csv_filename)
+            
+            df = pd.DataFrame(courier_data)
+            df.to_csv(csv_path, index=False)
+            
+            logger.info(f"Created courier upload demo CSV: {csv_filename}")
+            return csv_path
+        else:
+            logger.warning("No courier data generated - no valid Our_Barcode values found")
+            return None
+    except Exception as e:
+        logger.error(f"Failed to create courier CSV demo file: {e}", exc_info=True)
+        return None
 
 def _save_excel_file(
     rows: List[Dict[str, Any]],
