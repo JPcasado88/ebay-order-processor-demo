@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}eBay Order Processor - Results{% endblock %}
+
+{% block content %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Make sure the loading overlay is hidden when results page loads
+        const loadingOverlay = document.getElementById('loading-overlay');
+        if (loadingOverlay) {
+            loadingOverlay.style.display = 'none';
+        }
+    });
+</script>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="card-title mb-0">Processing Results</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <h5>Order Processing Summary</h5>
+                    <p>Processed {{ results.processed_orders }} orders successfully.</p>
+                    <p>Order types: {{ results.order_types|join(', ') }}</p>
+                    {% if results.force_complete %}
+                    <p><strong>Note:</strong> Large order processing completed with asynchronous processing.</p>
+                    {% endif %}
+                </div>
+
+                {% if results.generated_files %}
+                <div class="mt-4">
+                    <h5>Generated Files</h5>
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Filename</th>
+                                    <th>Type</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for file in results.generated_files %}
+                                <tr>
+                                    <td>{{ file.name }}</td>
+                                    <td>{{ file.type }}</td>
+                                    <td>
+                                        <a href="{{ url_for('files.download_single_file', filename=file.name) }}" class="btn btn-sm btn-primary">Download</a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <a href="{{ url_for('files.download_zip_archive') }}" id="download-all" class="btn btn-success">Download All Files (ZIP)</a>
+                    </div>
+                </div>
+                {% else %}
+                <div class="alert alert-warning mt-4">
+                    <p>No files were generated. This could be because no orders were found matching your criteria.</p>
+                </div>
+                {% endif %}
+                
+                <div class="mt-4">
+                    <a href="{{ url_for('processing.index') }}" class="btn btn-secondary">Return to Form</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

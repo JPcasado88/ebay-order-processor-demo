@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Tracking Update Results{% endblock %}
+
+{% block content %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Hide loading overlay when page loads
+        const loadingOverlay = document.getElementById('loading-overlay');
+        if (loadingOverlay) {
+            loadingOverlay.style.display = 'none';
+        }
+    });
+</script>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="card-title mb-0">Tracking Update Results</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <h5>Tracking Update Summary</h5>
+                    <p>Updated a total of {{ total_updates }} tracking numbers.</p>
+                </div>
+
+                {% if updated_files %}
+                <div class="mt-4">
+                    <h5>Updated Files</h5>
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Original File</th>
+                                    <th>Updated File</th>
+                                    <th>Updates</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for file in updated_files %}
+                                <tr>
+                                    <td>{{ file.original_file }}</td>
+                                    <td>{{ file.updated_file }}</td>
+                                    <td>{{ file.updates }}</td>
+                                    <td>
+                                        <a href="{{ url_for('files.download_single_file', filename=file.updated_file) }}" class="btn btn-sm btn-primary">Download</a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% else %}
+                <div class="alert alert-warning mt-4">
+                    <p>No files were updated. This could be because no matching barcodes were found in the store files.</p>
+                </div>
+                {% endif %}
+                
+                <div class="mt-4">
+                            <a href="{{ url_for('processing.index') }}" class="btn btn-secondary">Return to Home</a>
+        <a href="{{ url_for('tracking.upload_tracking_form') }}" class="btn btn-primary">Upload Another File</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

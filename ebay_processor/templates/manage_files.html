@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}eBay Order Processor - Manage Files{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="card-title mb-0">Manage Generated Files</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <form method="post" action="{{ url_for('files.manage_files') }}" class="form-inline">
+                            <div class="input-group">
+                                <input type="hidden" name="action" value="delete_old">
+                                <input type="number" class="form-control" name="days" value="30" min="1" max="365">
+                                <div class="input-group-append">
+                                    <span class="input-group-text">days old</span>
+                                </div>
+                                <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete these files?')">
+                                    Delete Files Older Than
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <a href="{{ url_for('processing.index') }}" class="btn btn-secondary">Back to Main</a>
+                    </div>
+                </div>
+                
+                {% if files %}
+                <form method="post" action="{{ url_for('files.manage_files') }}">
+                    <input type="hidden" name="action" value="delete_selected">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th><input type="checkbox" id="select-all"></th>
+                                    <th>Filename</th>
+                                    <th>Size</th>
+                                    <th>Modified</th>
+                                    <th>Age (days)</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for file in files %}
+                                <tr>
+                                    <td><input type="checkbox" name="selected_files" value="{{ file.name }}"></td>
+                                    <td>{{ file.name }}</td>
+                                    <td>{{ "%.2f"|format(file.size_kb) }} KB</td>
+                                    <td>{{ file.modified.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                    <td>{{ file.age_days }}</td>
+                                    <td>
+                                        <a href="{{ url_for('files.download_single_file', filename=file.name) }}" class="btn btn-sm btn-primary">Download</a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete the selected files?')">
+                        Delete Selected
+                    </button>
+                </form>
+                {% else %}
+                <div class="alert alert-info">No files found in the output directory.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const selectAll = document.getElementById('select-all');
+        if (selectAll) {
+            selectAll.addEventListener('change', function() {
+                const checkboxes = document.querySelectorAll('input[name="selected_files"]');
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = selectAll.checked;
+                });
+            });
+        }
+    });
+</script>
+{% endblock %} 

@@ -1,0 +1,24 @@
+# requirements.txt
+
+# --- Core Framework ---
+Flask==2.3.3
+Werkzeug==2.3.7
+itsdangerous==2.1.2
+Jinja2==3.1.2
+click==8.1.7
+
+# --- Session Management ---
+Flask-Session==0.8.0
+
+# --- WSGI Server ---
+gunicorn
+
+# --- Environment & Data Handling ---
+python-dotenv
+pandas
+openpyxl
+
+# --- API & Scheduling ---
+requests
+APScheduler
+ebaysdk==2.2.0

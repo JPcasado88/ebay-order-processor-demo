@@ -1,0 +1,14 @@
+{
+    "demo_store_1": {
+        "access_token": "v^1.1#i^1#r^0#f^0#I^3#[DEMO_TOKEN_PLACEHOLDER_FOR_STORE_1]",
+        "expiry_time": "2025-12-31T23:59:59.000000+00:00"
+    },
+    "demo_store_2": {
+        "access_token": "v^1.1#i^1#f^0#p^3#r^0#I^3#[DEMO_TOKEN_PLACEHOLDER_FOR_STORE_2]",
+        "expiry_time": "2025-12-31T23:59:59.000000+00:00"
+    },
+    "demo_store_3": {
+        "access_token": "v^1.1#i^1#f^0#r^0#p^3#I^3#[DEMO_TOKEN_PLACEHOLDER_FOR_STORE_3]",
+        "expiry_time": "2025-12-31T23:59:59.000000+00:00"
+    }
+} 

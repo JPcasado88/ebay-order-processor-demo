@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Tracking Data{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="card-title mb-0">Upload Tracking Data</h5>
+            </div>
+            <div class="card-body">
+                <p>Upload a CSV file containing tracking information to update the store shipping files.</p>
+                
+                <form action="{{ url_for('tracking.process_tracking_upload') }}" method="post" enctype="multipart/form-data" id="upload-form">
+                    <div class="form-group mb-3">
+                        <label for="tracking_file"><strong>Tracking CSV File:</strong></label>
+                        <input type="file" class="form-control" id="tracking_file" name="tracking_file" accept=".csv" required>
+                        <small class="form-text text-muted">The CSV file should include 'Order number' and 'Consignment number' columns.</small>
+                    </div>
+                    
+                    <div class="form-group mb-4">
+                        <div class="form-check">
+                            <input type="checkbox" id="manual_upload" name="manual_upload" class="form-check-input">
+                            <label for="manual_upload" class="form-check-label">
+                                <strong>Manually upload store tracking file</strong> (Use this if no store files are detected)
+                            </label>
+                        </div>
+                        
+                        <div id="manual-upload-container" style="display: none; margin-top: 15px;">
+                            <label for="store_file"><strong>Store Tracking Excel File:</strong></label>
+                            <input type="file" class="form-control" id="store_file" name="store_file" accept=".xlsx">
+                            <small class="form-text text-muted">Upload a store tracking Excel file that contains columns for 'Barcode' and 'Tracking Number'.</small>
+                            <div class="mt-2">
+                                <a href="#" class="btn btn-sm btn-outline-secondary" onclick="alert('Template download not implemented yet')"
+                                    <i class="bi bi-download"></i> Download Template
+                                </a>
+                                <small class="text-muted ms-2">Download a template file if you need help with the format</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {% if store_files %}
+                    <div class="form-group mb-3" id="existing-files-section">
+                        <label><strong>Store Files to Update:</strong></label>
+                        <div class="form-check">
+                            <input type="checkbox" id="update_all" name="update_all" class="form-check-input" checked>
+                            <label for="update_all" class="form-check-label">Update all available store files</label>
+                        </div>
+                        
+                        <div id="store-files-container" style="display: none; margin-top: 15px;">
+                            {% for file in store_files %}
+                            <div class="form-check">
+                                <input type="checkbox" id="file_{{ loop.index }}" name="selected_files" value="{{ file.name }}" class="form-check-input file-checkbox">
+                                <label for="file_{{ loop.index }}" class="form-check-label">{{ file.name }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i> No existing store files detected in the output directory.
+                        Please use the manual upload option above to provide a store tracking file.
+                        <div class="mt-2">
+                            <strong>Tip:</strong> If you haven't generated any store files yet, first process eBay orders to generate store tracking files, 
+                            or manually upload a store tracking file using the option above.
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="form-group">
+                        <button type="submit" class="btn btn-primary">Process Tracking Data</button>
+                        <a href="{{ url_for('processing.index') }}" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const updateAllCheckbox = document.getElementById('update_all');
+        const storeFilesContainer = document.getElementById('store-files-container');
+        const fileCheckboxes = document.querySelectorAll('.file-checkbox');
+        
+        if (updateAllCheckbox && storeFilesContainer) {
+            updateAllCheckbox.addEventListener('change', function() {
+                storeFilesContainer.style.display = this.checked ? 'none' : 'block';
+                
+                // Check/uncheck all file checkboxes based on the "Update All" checkbox
+                fileCheckboxes.forEach(checkbox => {
+                    checkbox.checked = this.checked;
+                });
+            });
+        }
+        
+        // Manual upload toggle logic
+        const manualUploadCheckbox = document.getElementById('manual_upload');
+        const manualUploadContainer = document.getElementById('manual-upload-container');
+        const existingFilesSection = document.getElementById('existing-files-section');
+        
+        if (manualUploadCheckbox && manualUploadContainer) {
+            manualUploadCheckbox.addEventListener('change', function() {
+                manualUploadContainer.style.display = this.checked ? 'block' : 'none';
+                
+                // Hide existing files section if manual upload is checked
+                if (existingFilesSection) {
+                    existingFilesSection.style.display = this.checked ? 'none' : 'block';
+                }
+                
+                // Make store_file required if manual upload is checked
+                const storeFileInput = document.getElementById('store_file');
+                if (storeFileInput) {
+                    storeFileInput.required = this.checked;
+                }
+            });
+        }
+        
+        // Show loading overlay when form is submitted
+        const uploadForm = document.getElementById('upload-form');
+        if (uploadForm) {
+            uploadForm.addEventListener('submit', function(event) {
+                // Basic validation
+                if (manualUploadCheckbox && manualUploadCheckbox.checked) {
+                    const storeFileInput = document.getElementById('store_file');
+                    if (!storeFileInput || !storeFileInput.files || !storeFileInput.files[0]) {
+                        alert('Please select a store tracking file to upload.');
+                        event.preventDefault();
+                        return;
+                    }
+                }
+                
+                document.getElementById('loading-overlay').style.display = 'block';
+                
+                const submitButton = this.querySelector('button[type="submit"]');
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

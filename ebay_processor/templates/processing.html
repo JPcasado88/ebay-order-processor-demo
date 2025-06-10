@@ -1,0 +1,347 @@
+{% extends "base.html" %}
+
+{% block title %}eBay Order Processor - Processing{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="card-title mb-0">Processing eBay Orders</h5>
+            </div>
+            <div class="card-body">
+                <div id="processing-status" class="text-center mb-4">
+                    <div class="spinner-border text-primary mb-3" role="status">
+                        <span class="sr-only">Processing...</span>
+                    </div>
+                    <h4 id="status-message">Processing your orders...</h4>
+                    <p id="status-details">Initializing...</p>
+                    
+                    <div class="progress mt-4 mb-2">
+                        <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                             role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                    </div>
+                    
+                    <div class="alert alert-info mt-3">
+                        <small>You can safely navigate away from this page. Processing will continue in the background.</small>
+                    </div>
+                </div>
+                
+                <div id="store-progress" class="mt-4">
+                    <h5>Store Progress:</h5>
+                    <div id="store-progress-container">
+                        <!-- Store progress will be inserted here -->
+                        <p class="text-muted">Loading store information...</p>
+                    </div>
+                </div>
+                
+                <div id="error-container" class="alert alert-danger mt-4" style="display: none;">
+                    <h5>Error occurred during processing:</h5>
+                    <p id="error-message"></p>
+                    <p>The process might continue in the background. Check the Results page for any generated files.</p>
+                </div>
+                
+                <div id="completion-container" class="alert alert-success mt-4" style="display: none;">
+                    <h5>Processing complete!</h5>
+                    <p id="completion-message"></p>
+                    <a id="view-results-btn" href="#" class="btn btn-success mt-2">View Results</a>
+                </div>
+                
+                <div class="text-center mt-4">
+                    <a href="{{ url_for('processing.index') }}" class="btn btn-secondary">Back to Main Page</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Store the process ID
+    const processId = "{{ process_id }}";
+    let checkStatusInterval;
+    let failedChecks = 0;
+    const MAX_FAILED_CHECKS = 5;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('Processing page loaded for process ID:', processId);
+        
+        // Start checking status immediately
+        checkStatus();
+        
+        // Set interval to check status every 3 seconds
+        checkStatusInterval = setInterval(checkStatus, 3000);
+        
+        // Setup view results button
+        const viewResultsBtn = document.getElementById('view-results-btn');
+        if (viewResultsBtn) {
+            viewResultsBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                // Use the URL from the href attribute, which gets set by updateUI when complete
+                if (viewResultsBtn.href && viewResultsBtn.href !== '#') {
+                    window.location.href = viewResultsBtn.href;
+                } else {
+                    // Fallback to correct route pattern
+                    window.location.href = `/process/results/${processId}`;
+                }
+            });
+        }
+    });
+    
+    function checkStatus() {
+                    fetch("{{ url_for('processing.get_status', process_id=process_id) }}")
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Log data for debugging
+                console.log('Status data:', data);
+                
+                try {
+                    updateUI(data);
+                } catch (updateError) {
+                    console.error('Error updating UI:', updateError);
+                    document.getElementById('status-message').textContent = 'Error updating display';
+                    document.getElementById('status-details').textContent = 'Processing continues in background';
+                }
+                
+                // If processing is complete or failed, stop checking
+                if (data.status === 'complete' || data.status === 'error') {
+                    clearInterval(checkStatusInterval);
+                }
+            })
+            .catch(error => {
+                console.error('Error checking status:', error);
+                
+                // Try to update minimal UI elements safely
+                try {
+                    document.getElementById('status-message').textContent = 'Error checking status';
+                    document.getElementById('status-details').textContent = 
+                        'Processing continues in background. You can safely return to the main page.';
+                } catch (uiError) {
+                    console.error('Error updating error message UI:', uiError);
+                }
+            });
+    }
+
+    function getStatusTitle(status) {
+        switch(status) {
+            case 'initializing': return 'Initializing...';
+            case 'processing': return 'Processing Orders...';
+            case 'complete': return 'Processing Complete!';
+            case 'error': return 'Error Processing Orders';
+            default: return 'Processing...';
+        }
+    }
+    
+    function updateUI(data) {
+        if (!data) {
+            console.error('No data received from status check');
+            return;
+        }
+        
+        // Handle non-recoverable errors
+        if (data.status === 'error' && data.recoverable === false) {
+            // Display error and provide restart option
+            const statusMessage = document.getElementById('status-message');
+            if (statusMessage) {
+                statusMessage.textContent = 'Process Not Found';
+            }
+            
+            const statusDetails = document.getElementById('status-details');
+            if (statusDetails) {
+                statusDetails.textContent = data.message || 'The process could not be found. It may have been terminated.';
+            }
+            
+            // Update error container
+            const errorContainer = document.getElementById('error-container');
+            if (errorContainer) {
+                errorContainer.style.display = 'block';
+                const errorMessage = document.getElementById('error-message');
+                if (errorMessage) {
+                    errorMessage.textContent = data.message || 'Process not found';
+                }
+                
+                // Add restart button if it doesn't exist
+                if (!document.getElementById('restart-button')) {
+                    const restartButton = document.createElement('a');
+                    restartButton.id = 'restart-button';
+                    restartButton.href = '/';
+                    restartButton.className = 'btn btn-primary mt-2';
+                    restartButton.textContent = 'Start New Process';
+                    errorContainer.appendChild(restartButton);
+                }
+            }
+            
+            // Stop checking for updates
+            clearInterval(checkStatusInterval);
+            return;
+        }
+        
+        // Handle redirects to another process
+        if (data.status === 'redirect' && data.redirect_to) {
+            console.log('Redirecting to active process:', data.redirect_to);
+            window.location.href = data.redirect_to;
+            return;
+        }
+        
+        // Normal UI updates for recoverable situations
+        const statusMessage = document.getElementById('status-message');
+        if (statusMessage) {
+            statusMessage.textContent = getStatusTitle(data.status || 'unknown');
+        }
+        
+        const statusDetails = document.getElementById('status-details');
+        if (statusDetails) {
+            statusDetails.textContent = data.message || '';
+        }
+        
+        // Update progress bar
+        const progressBar = document.getElementById('progress-bar');
+        if (progressBar) {
+            const progress = Math.round(data.progress || 0);
+            progressBar.style.width = `${progress}%`;
+            progressBar.setAttribute('aria-valuenow', progress);
+            progressBar.textContent = `${progress}%`;
+        }
+        
+        // Update store progress
+        try {
+            updateStoreProgress(data.store_progress || {});
+        } catch (storeError) {
+            console.error('Error updating store progress:', storeError);
+        }
+        
+        // Show/hide appropriate containers based on status
+        const errorContainer = document.getElementById('error-container');
+        const completionContainer = document.getElementById('completion-container');
+        
+        if (data.status === 'error') {
+            if (errorContainer) {
+                errorContainer.style.display = 'block';
+                const errorMessage = document.getElementById('error-message');
+                if (errorMessage) {
+                    errorMessage.textContent = data.message || 'An unknown error occurred';
+                }
+            }
+            if (completionContainer) {
+                completionContainer.style.display = 'none';
+            }
+        } else if (data.status === 'complete') {
+            if (errorContainer) {
+                errorContainer.style.display = 'none';
+            }
+            if (completionContainer) {
+                completionContainer.style.display = 'block';
+                const completionMessage = document.getElementById('completion-message');
+                if (completionMessage) {
+                    completionMessage.textContent = 
+                        `Successfully generated ${data.generated_files ? data.generated_files.length : 0} files.`;
+                }
+                
+                // Update results button
+                const viewResultsBtn = document.getElementById('view-results-btn');
+                if (viewResultsBtn && data.result_url) {
+                    viewResultsBtn.href = data.result_url;
+                }
+            }
+        } else {
+            if (errorContainer) {
+                errorContainer.style.display = 'none';
+            }
+            if (completionContainer) {
+                completionContainer.style.display = 'none';
+            }
+        }
+    }
+
+
+    
+    function updateStoreProgress(storeProgress) {
+        const container = document.getElementById('store-progress-container');
+        if (!container) return;
+        
+        // Clear container
+        container.innerHTML = '';
+        
+        // Get store IDs - safely check that storeProgress is an object first
+        const storeIds = (typeof storeProgress === 'object' && storeProgress !== null) 
+            ? Object.keys(storeProgress).sort() 
+            : [];
+        
+        if (storeIds.length === 0) {
+            container.innerHTML = '<p class="text-muted">No store processing information available yet.</p>';
+            return;
+        }
+        
+        // Create a progress card for each store
+        storeIds.forEach(storeId => {
+            if (!storeId) return; // Skip if storeId is undefined
+            
+            // Safely get store data
+            const storeData = storeProgress[storeId] || {};
+            
+            const card = document.createElement('div');
+            card.className = 'card mb-2';
+            
+            let statusClass;
+            switch(storeData.status) {
+                case 'complete': statusClass = 'bg-success'; break;
+                case 'error': statusClass = 'bg-danger'; break;
+                case 'processing': statusClass = 'bg-primary'; break;
+                default: statusClass = 'bg-secondary';
+            }
+            
+            // Build status content
+            let statusContent = '';
+            if (storeData.status === 'processing') {
+                // Show current page of total pages if available
+                let pageInfo = storeData.page ? `page ${storeData.page}` : '';
+                
+                // Add total pages if available
+                if (storeData.max_pages) {
+                    pageInfo += ` of ${storeData.max_pages}`;
+                }
+                
+                statusContent = `
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    Processing ${pageInfo} - Found ${storeData.orders_found || 0} orders
+                `;
+            } else if (storeData.status === 'complete') {
+                // Show total pages information if available
+                let pagesInfo = '';
+                if (storeData.total_pages) {
+                    pagesInfo = ` (${storeData.total_pages} pages processed)`;
+                }
+                
+                statusContent = `
+                    <i class="bi bi-check-circle"></i>
+                    Complete${pagesInfo} - Found ${storeData.orders_found || 0} orders
+                `;
+            } else if (storeData.status === 'error') {
+                statusContent = `
+                    <i class="bi bi-exclamation-triangle"></i>
+                    Error: ${storeData.error || 'Unknown error'}
+                `;
+            } else {
+                statusContent = 'Waiting...';
+            }
+            
+            card.innerHTML = `
+                <div class="card-header ${statusClass} text-white">
+                    <h6 class="card-title mb-0">Store: ${storeId}</h6>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0">${statusContent}</p>
+                </div>
+            `;
+            
+            container.appendChild(card);
+        });
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,83 @@
+# .gitignore
+#
+# This file tells Git which files and directories to ignore.
+# It's crucial for keeping the repository clean and secure.
+
+# --- Secrets ---
+# NEVER commit your local environment file.
+.env
+.env.local
+.env.production
+
+# --- Sensitive Business Data ---
+# Real client/business data files
+data/ebay_tokens.json
+data/ktypemaster3.csv
+data/*_real.csv
+data/*_production.*
+
+# --- Python ---
+# Byte-compiled / optimized / C-extensions
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# --- Virtual Environments ---
+# A common name for a virtual environment folder.
+venv/
+.venv/
+env/
+.env/
+ENV/
+.tox/
+
+# --- IDE / Editor ---
+# Common editor-specific folders and files.
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- Application-Generated Files ---
+# Ignore generated output files, session data, and logs.
+# This prevents large, non-source files from bloating the repository.
+output/
+flask_session/
+logs/
+instance/
+
+# Ignore the config.json file which may contain updated (but not refresh) tokens.
+config.json
+
+# --- OS-specific ---
+# macOS
+.DS_Store
+# Windows
+Thumbs.db
+
+# --- Railway ---
+.railway/
+
+# --- Railway Secrets ---
+.env.local

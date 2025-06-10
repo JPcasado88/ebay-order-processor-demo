@@ -1,0 +1,239 @@
+<!-- Quick Access Card -->
+
+{% extends "base.html" %}
+
+{% block title %}eBay Order Processor - Home{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <!-- Quick Access Card -->
+        <div class="card mb-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="card-title mb-0">Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 text-center mb-3">
+                        <a href="{{ url_for('tracking.upload_tracking_form') }}" class="btn btn-primary btn-lg w-100">
+                            Upload Tracking Data
+                        </a>
+                        <small class="text-muted mt-2 d-block">Match carrier tracking numbers with your orders</small>
+                    </div>
+                    <div class="col-md-6 text-center mb-3">
+                        <a href="{{ url_for('files.manage_files') }}" class="btn btn-secondary btn-lg w-100">
+                            Manage Generated Files
+                        </a>
+                        <small class="text-muted mt-2 d-block">Download or delete previously generated files</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Order Processing Card -->
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="card-title mb-0">Process eBay Orders</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('processing.process_async') }}" method="post" id="processing-form">
+                    <!-- Date Range Section -->
+                    <div class="form-group">
+                        <label for="from_date">Date Range:</label>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <input type="datetime-local" id="from_date" name="from_date" class="form-control" placeholder="From Date (optional)">
+                                <small class="form-text text-muted">Leave empty to use default range (29 days)</small>
+                            </div>
+                            <div class="col-md-6 d-flex align-items-center">
+                                <span>to Current Time (UTC)</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Order Types Section -->
+                    <div class="form-group">
+                        <label>Order Processing:</label>
+                        <div class="form-check">
+                            <input type="checkbox" id="all_orders" name="order_types" value="all" class="form-check-input" checked>
+                            <label for="all_orders" class="form-check-label">Process All Orders</label>
+                            <small class="form-text text-muted">Both standard and express orders will be processed together</small>
+                        </div>
+                    </div>
+                    
+                    <!-- Output Files Section -->
+                    <div class="form-group">
+                        <label>Output Files to Generate:</label>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input type="checkbox" id="run_files" name="output_files" value="run" class="form-check-input" checked>
+                                    <label for="run_files" class="form-check-label">RUN Files (Consolidated)</label> 
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" id="courier_master" name="output_files" value="courier_master" class="form-check-input" checked>
+                                    <label for="courier_master" class="form-check-label">COURIER_MASTER (Consolidated)</label> 
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="output_files" value="run24h" id="run24h_checkbox" checked>
+                                    <label class="form-check-label" for="run24h_checkbox">RUN24H Files (Consolidated, multi-product orders only)</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input type="checkbox" id="run_duplicates" name="output_files" value="run_duplicates" class="form-check-input" checked>
+                                    <label for="run_duplicates" class="form-check-label">DUPLICATES (Consolidated)</label> 
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" id="tracking_file" name="output_files" value="tracking" class="form-check-input" checked>
+                                    <label for="tracking_file" class="form-check-label">Tracking Files (Per Store + Consolidated)</label> 
+                                    <small class="form-text text-muted">Generates both individual store files and a combined file</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                
+                <!-- Options Section -->
+                <div class="form-group">
+                    <label>Options:</label>
+                    <div class="form-check">
+                        <input type="checkbox" id="next_24h_only" name="next_24h_only" class="form-check-input" checked>
+                        <label for="next_24h_only" class="form-check-label">Get only orders to be dispatched in the next 24h</label>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" id="include_all_orders" name="include_all_orders" class="form-check-input">
+                        <label for="include_all_orders" class="form-check-label">Include Already Dispatched Orders</label>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" id="recent_only" name="recent_only" class="form-check-input">
+                        <label for="recent_only" class="form-check-label">Only Process Orders from Last 24 Hours</label>
+                    </div>
+                </div>
+                    
+                    <div class="form-group mt-4">
+                        <button type="submit" class="btn btn-primary">Process Orders</button>
+                    </div>
+                </form>
+            </div>
+        
+        
+        </div>
+        <!-- NEW Troubleshooting Card -->
+        <div class="card border-danger mt-4"> {# Use danger border for visibility #}
+            <div class="card-header bg-danger text-white"> {# Danger background #}
+                <h5 class="card-title mb-0"><i class="fas fa-bomb me-2"></i>Clear Temporary Server State</h5> {# Changed icon and title #}
+            </div>
+            <div class="card-body">
+                <p class="card-text">
+                    If the application seems stuck (e.g., infinite loading after starting processing)
+                    or behaves unexpectedly even after waiting, clearing *all* temporary state
+                    on the server might resolve the issue by removing potentially leftover files or records
+                    from previous incomplete runs.
+                </p>
+                <p class="text-danger fw-bold"> {/* Added emphasis */}
+                    <i class="fas fa-exclamation-triangle me-1"></i> Extremely Destructive Action!
+                </p>
+                <p>
+                    Clicking this button will immediately attempt to delete:
+                    <ul>
+                        <li>All active user session files (logging <strong>everyone</strong> out).</li>
+                        <li>All background process status records (<code>.pkl</code> files).</li>
+                        <li>All temporary batch processing directories (<code>temp_batches/batch_*</code>).</li>
+                    </ul>
+                     This action is intended only for severe troubleshooting and <strong>cannot be undone</strong>.
+                     It will <strong>not</strong> delete the final generated output files (like `.xlsx`, `.zip`) in the main output folder.
+                </p>
+                {# *** Update the form action and confirmation message *** #}
+                <form action="{{ url_for('processing.clear_temporary_state') }}" method="post" class="mt-3"
+                      onsubmit="return confirm('ABSOLUTELY SURE?\n\nThis deletes ALL sessions (logs everyone out), process status records, AND temporary processing folders.\n\nThis is for fixing hangs ONLY and cannot be undone.');">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash-alt me-1"></i> Clear ALL Temporary State Now
+                    </button>
+                </form>
+            </div>
+            <div class="card-footer text-muted small">
+                Use this only if the application is stuck and won't recover. Regular cleanup happens automatically. This will NOT stop a process already running/stuck, but cleans up before trying again.
+            </div>
+        </div>
+        <!-- End of Troubleshooting Card -->
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Form validation and submission handling
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('processing-form');
+        
+        if (form) {
+            form.addEventListener('submit', function(event) {
+                event.preventDefault();
+                
+                // Client-side validation
+                const orderTypes = document.querySelectorAll('input[name="order_types"]:checked');
+                const outputFiles = document.querySelectorAll('input[name="output_files"]:checked');
+                
+                if (orderTypes.length === 0) {
+                    alert('Please select at least one order type');
+                    return;
+                }
+                
+                if (outputFiles.length === 0) {
+                    alert('Please select at least one output file type');
+                    return;
+                }
+                
+                // Disable submit button and show loading state
+                const submitButton = this.querySelector('button[type="submit"]');
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Starting...';
+                }
+                
+                // Submit the form via AJAX
+                fetch(form.action, {
+                    method: 'POST',
+                    body: new FormData(form),
+                    credentials: 'same-origin',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => {
+                    console.log('Response status:', response.status);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Response data:', data);
+                    if (data.status === 'error') {
+                        // Show error and re-enable form
+                        alert('Error: ' + data.message);
+                        submitButton.disabled = false;
+                        submitButton.textContent = 'Process Orders';
+                    } else if (data.status === 'started') {
+                        // Redirect to processing page using the URL from the response
+                        console.log('Redirecting to:', data.redirect_url);
+                        window.location.href = data.redirect_url;
+                    } else {
+                        // Handle unexpected response
+                        console.error('Unexpected response:', data);
+                        alert('Unexpected response from server. Please try again.');
+                        submitButton.disabled = false;
+                        submitButton.textContent = 'Process Orders';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while processing your request. Please try again.');
+                    submitButton.disabled = false;
+                    submitButton.textContent = 'Process Orders';
+                });
+            });
+        }
+    });
+</script>
+{% endblock %}
