@@ -1,6 +1,8 @@
 # 🚀 eBay Order Processor - Demo Version for Recruiters
 
+
 > **Note**: This is a sanitized demo version prepared specifically for recruiting purposes. All sensitive client data, API tokens, and proprietary business logic have been replaced with sample data.
+> For login use demo // demo123
 
 ## 📋 Project Overview
 
