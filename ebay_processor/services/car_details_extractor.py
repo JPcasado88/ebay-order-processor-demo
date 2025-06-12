@@ -1,6 +1,6 @@
 # ebay_processor/services/car_details_extractor.py
 """
-Servicio de Extracción de Detalles de Vehículos.
+Vehicle Details Extraction Service.
 ...
 """
 
@@ -8,71 +8,71 @@ import logging
 import re
 from typing import Dict, Optional
 
-# Importamos las utilidades de los módulos correctos.
+# Import utilities from the correct modules.
 from ..utils.string_utils import normalize_make, normalize_model
-from ..utils.date_utils import normalize_year_range # <<< Importado desde su nuevo hogar.
+from ..utils.date_utils import normalize_year_range # <<< Imported from its new home.
 
 logger = logging.getLogger(__name__)
 
 class CarDetailsExtractor:
     """
-    Encapsula la lógica para extraer marca, modelo y año de un título de producto.
+    Encapsulates the logic for extracting make, model and year from a product title.
     """
 
-    # Palabras comunes en los títulos que no aportan información sobre el vehículo
-    # y que pueden interferir con la extracción.
+    # Common words in titles that don't provide vehicle information
+    # and may interfere with extraction.
     NOISE_WORDS = [
         'tailored', 'carpet', 'car mats', 'floor mats', 'set', '4pcs', '5pcs', 'pc',
         'heavy duty', 'rubber', 'solid trim', 'uk made', 'custom', 'fully',
         'black', 'grey', 'blue', 'red', 'beige', 'with', 'trim', 'edge', 'for', 'fits'
     ]
     
-    # Patrón de regex principal y más fiable. Busca la estructura:
-    # (Marca) (Modelo) (Año)
-    # - La marca es una o más palabras.
-    # - El modelo es cualquier cosa hasta encontrar el año.
-    # - El año tiene varios formatos: 2010-2015, 2020+, 2024, etc.
+    # Main and most reliable regex pattern. Looks for the structure:
+    # (Make) (Model) (Year)
+    # - Make is one or more words.
+    # - Model is anything until the year is found.
+    # - Year has various formats: 2010-2015, 2020+, 2024, etc.
     VEHICLE_PATTERN = re.compile(
-        # Grupo 1: Marca (no codicioso)
+        # Group 1: Make (non-greedy)
         r'([A-Za-z\s\-]+?)\s+'
-        # Grupo 2: Modelo (cualquier caracter, no codicioso)
+        # Group 2: Model (any character, non-greedy)
         r'(.*?)\s+'
-        # Grupo 3: Año (múltiples formatos)
+        # Group 3: Year (multiple formats)
         r'(\d{4}\s*[-–to]+\s*\d{4}|\d{4}\s*[-–to]+\s*present|\d{4}\s*\+?|\d{4})',
         re.IGNORECASE
     )
 
     def _clean_title(self, title: str) -> str:
         """
-        Pre-procesa el título para eliminar ruido y facilitar la extracción.
+        Pre-processes the title to remove noise and facilitate extraction.
         
         Args:
-            title: El título original del producto.
+            title: The original product title.
 
         Returns:
-            El título limpio.
+            The cleaned title.
         """
-        # Eliminar contenido dentro de corchetes, ej: [Black with Red Trim]
+        # Remove content within brackets, e.g.: [Black with Red Trim]
         clean_title = re.sub(r'\[.*?\]', ' ', title)
         
-        # Eliminar las palabras "ruido" definidas en la clase.
-        # Se construye un regex para buscar cualquiera de estas palabras completas (\b).
+        # Remove the "noise" words defined in the class.
+        # Build a regex to search for any of these complete words (\b).
         noise_pattern = r'\b(' + '|'.join(self.NOISE_WORDS) + r')\b'
         clean_title = re.sub(noise_pattern, ' ', clean_title, flags=re.IGNORECASE)
         
-        # Normalizar múltiples espacios a uno solo.
+        # Normalize multiple spaces to single spaces.
         return ' '.join(clean_title.split())
 
     def extract(self, title: str) -> Optional[Dict[str, str]]:
         """
-        Método principal para extraer los detalles del vehículo de un título.
+        Main method for extracting vehicle details from a title.
 
         Args:
-            title: El título del producto de eBay.
+            title: The eBay product title.
 
         Returns:
-            Un diccionario con 'make', 'model' y 'year' si se encuentra una coincidencia,
-            o None en caso contrario.
+            A dictionary with 'make', 'model' and 'year' if a match is found,
+            or None otherwise.
         """
         if not isinstance(title, str):
             return None
@@ -82,22 +82,22 @@ class CarDetailsExtractor:
         match = self.VEHICLE_PATTERN.search(clean_title)
         
         if not match:
-            logger.debug(f"No se pudieron extraer detalles del título: '{title}' (limpio: '{clean_title}')")
+            logger.debug(f"Could not extract details from title: '{title}' (clean: '{clean_title}')")
             return None
             
         make_raw, model_raw, year_raw = match.groups()
         
-        # Usamos nuestras funciones de utilidad para normalizar los resultados.
+        # Use our utility functions to normalize the results.
         make = normalize_make(make_raw)
         model = normalize_model(model_raw)
         year = normalize_year_range(year_raw)
         
-        # Verificación final: asegurarnos de que la marca y el modelo no estén vacíos.
+        # Final verification: make sure make and model are not empty.
         if not make or not model:
-            logger.warning(f"Extracción parcial para '{title}'. Make o Model vacío después de normalizar.")
+            logger.warning(f"Partial extraction for '{title}'. Make or Model empty after normalizing.")
             return None
 
-        logger.info(f"Título '{title[:50]}...' -> Extraído: Make='{make}', Model='{model}', Year='{year}'")
+        logger.info(f"Title '{title[:50]}...' -> Extracted: Make='{make}', Model='{model}', Year='{year}'")
         return {
             'make': make,
             'model': model,

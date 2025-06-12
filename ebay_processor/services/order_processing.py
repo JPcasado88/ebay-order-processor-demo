@@ -27,7 +27,7 @@ class OrderProcessingService:
         self.process_store = ProcessStore(config['PROCESS_STORE_DIR'])
         self.process_info = self.process_store.get(process_id)
         if not self.process_info:
-            raise OrderProcessingError(f"No se pudo encontrar información para el process_id: {process_id}")
+            raise OrderProcessingError(f"Could not find information for process_id: {process_id}")
         
         self.barcode_service = BarcodeService(config['STORE_INITIALS'])
         from .car_details_extractor import CarDetailsExtractor
@@ -61,16 +61,16 @@ class OrderProcessingService:
 
     def run_processing(self):
         try:
-            self._update_status('processing', 'Cargando datos de referencia...', 5)
+            self._update_status('processing', 'Loading reference data...', 5)
             form_data = self.process_info['form_data']
             
             try:
                 matlist_df_cleaned = load_and_prepare_master_data(self.config['MATLIST_CSV_PATH'])
             except DataLoadingError as e:
-                self._update_status('error', f"Error crítico al cargar datos: {e}", 5)
+                self._update_status('error', f"Critical error loading data: {e}", 5)
                 raise
 
-            self._update_status('processing', 'Verificando y refrescando tokens de eBay...', 15)
+            self._update_status('processing', 'Verifying and refreshing eBay tokens...', 15)
             refreshed_accounts = ebay_api.check_and_refresh_tokens(
                 app_id=self.config['EBAY_APP_ID'],
                 cert_id=self.config['EBAY_CERT_ID'],
@@ -84,13 +84,13 @@ class OrderProcessingService:
             for i, store_account in enumerate(refreshed_accounts):
                 store_id = store_account['account_id']
                 progress = 20 + int((i / num_stores) * 50) if num_stores > 0 else 70
-                self._update_status('processing', f"Procesando tienda: {store_id}...", progress)
+                self._update_status('processing', f"Processing store: {store_id}...", progress)
 
                 # Initialize store progress
-                self._update_store_progress(store_id, 'processing', 'Iniciando procesamiento...', orders_found=0)
+                self._update_store_progress(store_id, 'processing', 'Starting processing...', orders_found=0)
 
                 try:
-                    ### CAMBIO ###: La llamada a la función que procesa la tienda ahora está aquí.
+                    ### CHANGE ###: The call to the function that processes the store is now here.
                     processed_data = self._process_single_store(
                         store_account, matlist_df_cleaned, form_data
                     )
@@ -104,12 +104,12 @@ class OrderProcessingService:
                     
                     # Mark store as complete
                     self._update_store_progress(
-                        store_id, 'complete', f"Completado - {store_orders_found} órdenes procesadas", 
+                        store_id, 'complete', f"Completed - {store_orders_found} orders processed", 
                         orders_found=store_orders_found
                     )
                     
                 except OrderProcessingError as e:
-                    logger.error(f"Error procesando la tienda {store_id}: {e}", exc_info=True)
+                    logger.error(f"Error processing store {store_id}: {e}", exc_info=True)
                     self.process_info.setdefault('store_errors', []).append(f"{store_id}: {e}")
                     # Mark store as error
                     self._update_store_progress(store_id, 'error', str(e), orders_found=0)
@@ -119,14 +119,14 @@ class OrderProcessingService:
             self.process_info['all_standard_orders'] = all_standard
             self.process_info['all_unmatched_items'] = all_unmatched
 
-            self._update_status('processing', 'Asignando códigos de barras únicos...', 75)
+            self._update_status('processing', 'Assigning unique barcodes...', 75)
             all_processed_items = all_expedited + all_standard
             run_date = datetime.now(timezone.utc)
             
             self.barcode_service.assign_base_barcodes(all_processed_items, run_date)
             self.barcode_service.assign_final_barcodes(all_processed_items)
             
-            self._update_status('processing', 'Generando archivos de salida...', 85)
+            self._update_status('processing', 'Generating output files...', 85)
             temp_dir = self.process_info['temp_dir']
             output_files_requested = form_data.get('output_files', [])
             generated_file_paths = {}
@@ -151,7 +151,7 @@ class OrderProcessingService:
                 path = file_generation.generate_unmatched_items_file(all_unmatched, temp_dir, run_date, self.config)
                 if path: generated_file_paths[os.path.basename(path)] = path
             
-            self._update_status('processing', 'Finalizando y archivando...', 95)
+            self._update_status('processing', 'Finalizing and archiving...', 95)
             persistent_output_dir = self.config['OUTPUT_DIR']
             
             for filename, temp_path in generated_file_paths.items():
@@ -162,7 +162,7 @@ class OrderProcessingService:
             zip_filename = f"ebay_orders_{run_date.strftime('%Y%m%d_%H%M%S')}.zip"
             zip_path = os.path.join(persistent_output_dir, zip_filename)
             
-            # Crear ZIP de forma segura
+            # Create ZIP safely
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
                 for filename, path in generated_file_paths.items():
                     if os.path.exists(path):
@@ -180,22 +180,22 @@ class OrderProcessingService:
             self.process_info['zip_file'] = {'name': zip_filename, 'path': zip_path}
             self.process_info['completion_time_iso'] = datetime.now(timezone.utc).isoformat()
             
-            self._update_status('complete', '¡Proceso completado!', 100)
+            self._update_status('complete', 'Process completed!', 100)
 
         except Exception as e:
-            logger.error(f"Error fatal en el proceso de fondo [{self.process_id}]: {e}", exc_info=True)
-            self._update_status('error', f'Error inesperado: {e}', self.process_info.get('progress', 0))
+            logger.error(f"Fatal error in background process [{self.process_id}]: {e}", exc_info=True)
+            self._update_status('error', f'Unexpected error: {e}', self.process_info.get('progress', 0))
         
         finally:
             temp_dir = self.process_info.get('temp_dir')
             if temp_dir and os.path.exists(temp_dir):
                 try:
                     shutil.rmtree(temp_dir)
-                    logger.info(f"Directorio temporal [{temp_dir}] eliminado.")
+                    logger.info(f"Temporary directory [{temp_dir}] deleted.")
                 except Exception as cleanup_err:
-                    logger.error(f"Error al eliminar el directorio temporal [{temp_dir}]: {cleanup_err}")
+                    logger.error(f"Error deleting temporary directory [{temp_dir}]: {cleanup_err}")
 
-    ### CAMBIO ###: Esta es la función que movimos aquí. Es un método privado de la clase.
+    ### CHANGE ###: This is the function we moved here. It's a private method of the class.
     def _process_single_store(self, store_account: Dict, matlist_df: pd.DataFrame, form_data: Dict) -> Dict[str, List]:
         store_id = store_account['account_id']
         access_token = store_account.get('access_token')
@@ -206,7 +206,7 @@ class OrderProcessingService:
             return self._process_single_store_demo(store_account, matlist_df, form_data)
         
         if not access_token:
-            logger.error(f"La tienda {store_id} no tiene token de acceso. Omitiendo.")
+            logger.error(f"Store {store_id} has no access token. Skipping.")
             return {'expedited': [], 'standard': [], 'unmatched': []}
 
         api_conn = Trading(
@@ -223,16 +223,16 @@ class OrderProcessingService:
         
         try:
             # Update store progress during API call
-            self._update_store_progress(store_id, 'processing', 'Obteniendo pedidos de eBay...', orders_found=0)
+            self._update_store_progress(store_id, 'processing', 'Getting orders from eBay...', orders_found=0)
             raw_orders = ebay_api.get_ebay_orders(api_conn, from_date, to_date, store_id)
-            self._update_store_progress(store_id, 'processing', f'Procesando {len(raw_orders)} pedidos...', orders_found=len(raw_orders))
+            self._update_store_progress(store_id, 'processing', f'Processing {len(raw_orders)} orders...', orders_found=len(raw_orders))
         except EbayApiError as e:
-            raise OrderProcessingError(f"Fallo al obtener pedidos para {store_id}: {e}") from e
+            raise OrderProcessingError(f"Failed to get orders for {store_id}: {e}") from e
 
         all_processed_items, unmatched_items = [], []
         order_item_counts = {}
 
-        logger.info(f"[{store_id}] Iniciando procesamiento de {len(raw_orders)} órdenes con filtros: include_all_orders={form_data.get('include_all_orders', False)}, next_24h_only={form_data.get('next_24h_only', False)}")
+        logger.info(f"[{store_id}] Starting processing of {len(raw_orders)} orders with filters: include_all_orders={form_data.get('include_all_orders', False)}, next_24h_only={form_data.get('next_24h_only', False)}")
         
         processed_count = 0
         skipped_dispatched = 0
@@ -241,19 +241,19 @@ class OrderProcessingService:
         for order in raw_orders:
             order_id = getattr(order, 'OrderID', 'Unknown')
             
-            # Filtro 1: Omitir pedidos según el checkbox 'Include Dispatched'
+            # Filter 1: Skip orders based on 'Include Dispatched' checkbox
             if self._should_skip_order(order, form_data.get('include_all_orders', False)):
                 skipped_dispatched += 1
-                logger.debug(f"[{store_id}] Orden {order_id} omitida: ya despachada")
+                logger.debug(f"[{store_id}] Order {order_id} skipped: already dispatched")
                 continue
             
-            # Filtro 2: Si el checkbox '24h only' está marcado, omitir si no es urgente.
+            # Filter 2: If '24h only' checkbox is checked, skip if not urgent.
             if form_data.get('next_24h_only', False):
                 is_urgent = self._is_shipping_due(order)
-                logger.debug(f"[{store_id}] Orden {order_id} es urgente: {is_urgent}")
+                logger.debug(f"[{store_id}] Order {order_id} is urgent: {is_urgent}")
                 if not is_urgent:
                     skipped_not_urgent += 1
-                    logger.debug(f"[{store_id}] Orden {order_id} omitida: no es urgente (no debe despacharse en 24h)")
+                    logger.debug(f"[{store_id}] Order {order_id} skipped: not urgent (should not ship within 24h)")
                     continue
 
             transactions = getattr(order.TransactionArray, 'Transaction', [])
@@ -269,7 +269,7 @@ class OrderProcessingService:
                 else:
                     unmatched_items.append(self._create_unmatched_item(txn, order, store_id))
         
-        logger.info(f"[{store_id}] Resumen de filtrado: {processed_count} procesadas, {skipped_dispatched} omitidas (ya despachadas), {skipped_not_urgent} omitidas (no urgentes)")
+        logger.info(f"[{store_id}] Filtering summary: {processed_count} processed, {skipped_dispatched} skipped (already dispatched), {skipped_not_urgent} skipped (not urgent)")
         
         for item in all_processed_items:
             order_id = item['ORDER ID']
@@ -291,7 +291,7 @@ class OrderProcessingService:
         to_date = datetime.now(timezone.utc)
         
         # Update store progress during mock API call
-        self._update_store_progress(store_id, 'processing', '[DEMO] Obteniendo pedidos de eBay...', orders_found=0)
+        self._update_store_progress(store_id, 'processing', '[DEMO] Getting orders from eBay...', orders_found=0)
         
         # Get demo orders instead of real API call
         raw_orders = ebay_api.get_demo_orders(store_id, from_date, to_date)
@@ -299,12 +299,12 @@ class OrderProcessingService:
         # Convert demo orders to the same format as real eBay orders for processing
         demo_orders = self._convert_demo_orders_to_ebay_format(raw_orders)
         
-        self._update_store_progress(store_id, 'processing', f'[DEMO] Procesando {len(demo_orders)} pedidos...', orders_found=len(demo_orders))
+        self._update_store_progress(store_id, 'processing', f'[DEMO] Processing {len(demo_orders)} orders...', orders_found=len(demo_orders))
 
         all_processed_items, unmatched_items = [], []
         order_item_counts = {}
 
-        logger.info(f"[DEMO MODE] [{store_id}] Iniciando procesamiento de {len(demo_orders)} órdenes con filtros: include_all_orders={form_data.get('include_all_orders', False)}, next_24h_only={form_data.get('next_24h_only', False)}")
+        logger.info(f"[DEMO MODE] [{store_id}] Starting processing of {len(demo_orders)} orders with filters: include_all_orders={form_data.get('include_all_orders', False)}, next_24h_only={form_data.get('next_24h_only', False)}")
         
         processed_count = 0
         skipped_dispatched = 0
@@ -316,15 +316,15 @@ class OrderProcessingService:
             # Apply the same filtering logic as real orders
             if self._should_skip_order(order, form_data.get('include_all_orders', False)):
                 skipped_dispatched += 1
-                logger.debug(f"[DEMO MODE] [{store_id}] Orden {order_id} omitida: ya despachada")
+                logger.debug(f"[DEMO MODE] [{store_id}] Order {order_id} skipped: already dispatched")
                 continue
             
             if form_data.get('next_24h_only', False):
                 is_urgent = self._is_shipping_due(order)
-                logger.debug(f"[DEMO MODE] [{store_id}] Orden {order_id} es urgente: {is_urgent}")
+                logger.debug(f"[DEMO MODE] [{store_id}] Order {order_id} is urgent: {is_urgent}")
                 if not is_urgent:
                     skipped_not_urgent += 1
-                    logger.debug(f"[DEMO MODE] [{store_id}] Orden {order_id} omitida: no es urgente")
+                    logger.debug(f"[DEMO MODE] [{store_id}] Order {order_id} skipped: not urgent")
                     continue
 
             transactions = getattr(order.TransactionArray, 'Transaction', [])
@@ -340,7 +340,7 @@ class OrderProcessingService:
                 else:
                     unmatched_items.append(self._create_unmatched_item(txn, order, store_id))
         
-        logger.info(f"[DEMO MODE] [{store_id}] Resumen de filtrado: {processed_count} procesadas, {skipped_dispatched} omitidas (ya despachadas), {skipped_not_urgent} omitidas (no urgentes)")
+        logger.info(f"[DEMO MODE] [{store_id}] Filtering summary: {processed_count} processed, {skipped_dispatched} skipped (already dispatched), {skipped_not_urgent} skipped (not urgent)")
         
         for item in all_processed_items:
             order_id = item['ORDER ID']
@@ -420,7 +420,7 @@ class OrderProcessingService:
         
         return converted_orders
 
-    ### CAMBIO ###: Nuevas funciones de ayuda privadas para mantener el código limpio.
+    ### CHANGE ###: New private helper functions to keep the code clean.
     def _process_transaction(self, txn: Any, order: Any, matlist_df: pd.DataFrame, store_id: str) -> Optional[List[Dict]]:
         item = getattr(txn, 'Item', None)
         if not item: return None
@@ -474,7 +474,7 @@ class OrderProcessingService:
             "ADD4": shipping_info.get('Country', ''),
             "POSTCODE": shipping_info.get('Postal Code', ''),
             "TEL NO": shipping_info.get('Phone', ''),
-            "EMAIL ADDRESS": buyer_email, # <<< Usamos nuestra variable segura
+            "EMAIL ADDRESS": buyer_email, # <<< Use our safe variable
             "QTY": '1',
             "Product Title": title,
             "Raw SKU": sku,
@@ -497,54 +497,54 @@ class OrderProcessingService:
     
     def _should_skip_order(self, order: Any, include_all_orders: bool) -> bool:
         """
-        Comprueba si un pedido debe ser omitido basado en su estado.
-        Esta es una emulación completa de la lógica de filtrado original.
+        Checks if an order should be skipped based on its status.
+        This is a complete emulation of the original filtering logic.
         """
         order_id = getattr(order, 'OrderID', 'Unknown')
         
-        # 1. Comprobación de estado general del pedido
+        # 1. General order status check
         status = getattr(order, 'OrderStatus', '').lower()
         cancel_status = getattr(order, 'CancelStatus', '').lower()
         if status in ['cancelled', 'inactive', 'invalid'] or 'cancel' in cancel_status:
-            logger.debug(f"[{order_id}] Omitido por estado de cancelación: {status}/{cancel_status}")
+            logger.debug(f"[{order_id}] Skipped due to cancellation status: {status}/{cancel_status}")
             return True
             
-        # 2. Comprobación del estado del pago y checkout
+        # 2. Payment and checkout status check
         checkout = getattr(order, 'CheckoutStatus', None)
         if checkout:
             if getattr(checkout, 'Status', '').lower() != 'complete':
-                logger.debug(f"[{order_id}] Omitido por checkout no completado.")
+                logger.debug(f"[{order_id}] Skipped due to incomplete checkout.")
                 return True
             
             payment_status = getattr(checkout, 'eBayPaymentStatus', '').lower()
-            # Omitir si el pago no se ha completado o está en proceso.
-            # 'NoPaymentFailure' significa que el pago fue exitoso o no aplica.
+            # Skip if payment has not been completed or is in process.
+            # 'NoPaymentFailure' means payment was successful or doesn't apply.
             if payment_status not in ['nopaymentfailure', 'paymentreceived', '']:
-                logger.debug(f"[{order_id}] Omitido por estado de pago: {payment_status}")
+                logger.debug(f"[{order_id}] Skipped due to payment status: {payment_status}")
                 return True
 
-        # 3. Comprobación de retención de pago
+        # 3. Payment hold check
         if getattr(order, 'PaymentHoldStatus', '') == 'PaymentHold':
-            logger.debug(f"[{order_id}] Omitido por pago retenido (PaymentHold).")
+            logger.debug(f"[{order_id}] Skipped due to payment hold (PaymentHold).")
             return True
 
-        # 4. Comprobación de si ya fue despachado (solo si el checkbox no está marcado)
+        # 4. Check if already shipped (only if checkbox is not checked)
         if not include_all_orders and getattr(order, 'ShippedTime', None):
-            logger.debug(f"[{order_id}] Omitido: ya despachado y no se incluyen todos.")
+            logger.debug(f"[{order_id}] Skipped: already shipped and not including all.")
             return True
             
-        # Si pasa todos los filtros, no se omite.
+        # If it passes all filters, don't skip.
         return False
     
     def _is_shipping_due(self, order: Any) -> bool:
-        """Comprueba si un pedido debe ser enviado en las próximas 24 horas hábiles."""
+        """Checks if an order should be shipped within the next 24 business hours."""
         uk_timezone = pytz.timezone('Europe/London')
         current_date_uk = datetime.now(uk_timezone).date()
         order_id = getattr(order, 'OrderID', 'Unknown')
         
-        logger.debug(f"[{order_id}] Evaluando urgencia de envío. Fecha actual UK: {current_date_uk}")
+        logger.debug(f"[{order_id}] Evaluating shipping urgency. Current UK date: {current_date_uk}")
         
-        # Comprobar por 'ExpectedShipDate'
+        # Check by 'ExpectedShipDate'
         expected_ship_date_str = getattr(order, 'ExpectedShipDate', None)
         logger.debug(f"[{order_id}] ExpectedShipDate raw: {expected_ship_date_str}")
         
@@ -552,14 +552,14 @@ class OrderProcessingService:
             expected_ship_date = parse_ebay_datetime(expected_ship_date_str)
             if expected_ship_date:
                 expected_date_uk = expected_ship_date.astimezone(uk_timezone).date()
-                logger.debug(f"[{order_id}] ExpectedShipDate procesado: {expected_date_uk}")
+                logger.debug(f"[{order_id}] ExpectedShipDate processed: {expected_date_uk}")
                 if expected_date_uk <= current_date_uk:
-                    logger.info(f"Pedido {order_id} es URGENTE (por ExpectedShipDate: {expected_date_uk}).")
+                    logger.info(f"Order {order_id} is URGENT (by ExpectedShipDate: {expected_date_uk}).")
                     return True
                 else:
-                    logger.debug(f"[{order_id}] No urgente por ExpectedShipDate: {expected_date_uk} > {current_date_uk}")
+                    logger.debug(f"[{order_id}] Not urgent by ExpectedShipDate: {expected_date_uk} > {current_date_uk}")
                 
-        # Comprobar por 'PaidTime' y 'DispatchTimeMax'
+        # Check by 'PaidTime' and 'DispatchTimeMax'
         paid_time_str = getattr(order, 'PaidTime', None)
         logger.debug(f"[{order_id}] PaidTime raw: {paid_time_str}")
         
@@ -567,7 +567,7 @@ class OrderProcessingService:
             paid_time = parse_ebay_datetime(paid_time_str)
             if paid_time:
                 paid_time_uk = paid_time.astimezone(uk_timezone)
-                dispatch_days = 1 # Por defecto
+                dispatch_days = 1 # Default
                 
                 if hasattr(order, 'ShippingDetails') and getattr(order.ShippingDetails, 'DispatchTimeMax', None):
                     try:
@@ -575,25 +575,25 @@ class OrderProcessingService:
                     except (ValueError, TypeError):
                         pass
                 
-                logger.debug(f"[{order_id}] PaidTime: {paid_time_uk.date()}, DispatchTimeMax: {dispatch_days} días")
+                logger.debug(f"[{order_id}] PaidTime: {paid_time_uk.date()}, DispatchTimeMax: {dispatch_days} days")
                 
-                # Calcular la fecha de envío (solo días laborables)
+                # Calculate shipping date (business days only)
                 ship_by_date = paid_time_uk.date()
                 days_added = 0
                 while days_added < dispatch_days:
                     ship_by_date += timedelta(days=1)
-                    if ship_by_date.weekday() < 5: # Lunes=0, Viernes=4
+                    if ship_by_date.weekday() < 5: # Monday=0, Friday=4
                         days_added += 1
 
-                logger.debug(f"[{order_id}] Fecha calculada de envío: {ship_by_date}")
+                logger.debug(f"[{order_id}] Calculated shipping date: {ship_by_date}")
                 
                 if ship_by_date <= current_date_uk:
-                    logger.info(f"Pedido {order_id} es URGENTE (por fecha de envío calculada: {ship_by_date}).")
+                    logger.info(f"Order {order_id} is URGENT (by calculated shipping date: {ship_by_date}).")
                     return True
                 else:
-                    logger.debug(f"[{order_id}] No urgente por fecha calculada: {ship_by_date} > {current_date_uk}")
+                    logger.debug(f"[{order_id}] Not urgent by calculated date: {ship_by_date} > {current_date_uk}")
                     
-        logger.debug(f"[{order_id}] Pedido NO es urgente (sin ExpectedShipDate ni PaidTime válidos)")
+        logger.debug(f"[{order_id}] Order is NOT urgent (no valid ExpectedShipDate or PaidTime)")
         return False
 
     def _get_shipping_address(self, order: Any) -> Dict:
@@ -660,15 +660,15 @@ class OrderProcessingService:
 
 def start_order_processing_thread(app, process_id: str):
     with app.app_context():
-        logger.info(f"Iniciando hilo de procesamiento para el process_id: {process_id}")
+        logger.info(f"Starting processing thread for process_id: {process_id}")
         try:
             service = OrderProcessingService(process_id, current_app.config)
             service.run_processing()
         except Exception as e:
-            logger.critical(f"No se pudo iniciar OrderProcessingService para [{process_id}]: {e}", exc_info=True)
+            logger.critical(f"Could not start OrderProcessingService for [{process_id}]: {e}", exc_info=True)
             store = ProcessStore(current_app.config.get('PROCESS_STORE_DIR'))
             if store:
                 info = store.get(process_id, {})
                 info['status'] = 'error'
-                info['message'] = f'Fallo de inicialización: {e}'
+                info['message'] = f'Initialization failure: {e}'
                 store.update(process_id, info)

@@ -1,15 +1,15 @@
 # ebay_processor/persistence/csv_loader.py
 """
-Módulo de Carga de Datos de Referencia (Catálogo).
+Reference Data (Catalog) Loading Module.
 
-Este módulo se encarga de la carga y preparación del archivo CSV maestro
-(e.g., ktypemaster3.csv) que contiene el catálogo de productos.
+This module handles the loading and preparation of the master CSV file
+(e.g., ktypemaster3.csv) that contains the product catalog.
 
-La preparación incluye:
-- Selección y validación de columnas requeridas.
-- Renombrado de columnas para consistencia interna.
-- Limpieza y normalización de datos para facilitar el matching.
-- Creación de columnas derivadas para optimizar las búsquedas.
+The preparation includes:
+- Selection and validation of required columns.
+- Column renaming for internal consistency.
+- Data cleaning and normalization to facilitate matching.
+- Creation of derived columns to optimize searches.
 """
 
 import logging
@@ -17,7 +17,7 @@ import re
 from datetime import datetime
 import pandas as pd
 
-# Utilidades para la carga de archivos y normalización de strings
+# Utilities for file loading and string normalization
 from ..utils.file_utils import load_csv_to_dataframe
 from ..utils.string_utils import normalize_ref_no
 from ..core.exceptions import DataLoadingError
@@ -27,61 +27,61 @@ logger = logging.getLogger(__name__)
 
 def load_and_prepare_master_data(file_path: str) -> pd.DataFrame:
     """
-    Carga y prepara el DataFrame del catálogo maestro desde un archivo CSV.
+    Loads and prepares the master catalog DataFrame from a CSV file.
 
     Args:
-        file_path: La ruta al archivo ktypemaster3.csv o similar.
+        file_path: The path to the ktypemaster3.csv file or similar.
 
     Returns:
-        Un DataFrame de pandas limpio y listo para ser usado por el servicio de matching.
+        A clean pandas DataFrame ready to be used by the matching service.
 
     Raises:
-        DataLoadingError: Si el archivo no puede ser cargado o tiene un formato inválido.
+        DataLoadingError: If the file cannot be loaded or has an invalid format.
     """
-    logger.info(f"Iniciando carga y preparación de datos maestros desde: {file_path}")
+    logger.info(f"Starting loading and preparation of master data from: {file_path}")
     
-    # Define las columnas que son absolutamente necesarias para que la app funcione.
+    # Define the columns that are absolutely necessary for the app to function.
     required_cols = [
         MasterDataColumns.TEMPLATE, MasterDataColumns.COMPANY, MasterDataColumns.MODEL,
         MasterDataColumns.YEAR, MasterDataColumns.MATS, MasterDataColumns.NUM_CLIPS,
         MasterDataColumns.CLIP_TYPE
     ]
     
-    # Carga el CSV usando nuestra utilidad, que ya valida la existencia de las columnas.
+    # Load the CSV using our utility, which already validates the existence of columns.
     try:
-        # Usamos `keep_default_na=False` para tratar celdas vacías como "" en lugar de NaN,
-        # lo que simplifica el manejo de strings.
+        # We use `keep_default_na=False` to treat empty cells as "" instead of NaN,
+        # which simplifies string handling.
         df = load_csv_to_dataframe(
             file_path, 
             required_columns=required_cols,
             keep_default_na=False,
-            dtype=str  # Cargar todo como string inicialmente para evitar errores de tipo.
+            dtype=str  # Load everything as string initially to avoid type errors.
         )
     except DataLoadingError as e:
-        logger.error(f"No se pudo cargar el archivo de datos maestros: {e}", exc_info=True)
+        logger.error(f"Could not load master data file: {e}", exc_info=True)
         raise
 
-    # Columnas opcionales que se usarán si existen.
+    # Optional columns that will be used if they exist.
     optional_cols = [MasterDataColumns.FORCED_MATCH_SKU]
     
-    # Crear una lista de todas las columnas a mantener.
+    # Create a list of all columns to keep.
     cols_to_keep = required_cols + [col for col in optional_cols if col in df.columns]
     
-    # Usar una copia para evitar el SettingWithCopyWarning de pandas.
+    # Use a copy to avoid pandas SettingWithCopyWarning.
     df_cleaned = df[cols_to_keep].copy()
     
-    # Renombrar columnas para consistencia interna en la aplicación.
+    # Rename columns for internal consistency in the application.
     df_cleaned.rename(columns={MasterDataColumns.NUM_CLIPS: MasterDataColumns.INTERNAL_CLIP_COUNT}, inplace=True)
     
-    # --- Limpieza y Normalización de Datos ---
+    # --- Data Cleaning and Normalization ---
 
-    # Normalizar la columna YEAR: reemplazar "to present" por el año actual.
+    # Normalize the YEAR column: replace "to present" with the current year.
     current_year = str(datetime.now().year)
     df_cleaned[MasterDataColumns.YEAR] = df_cleaned[MasterDataColumns.YEAR].str.replace(
         r'to\s+present', f'-{current_year}', flags=re.IGNORECASE, regex=True
     )
     
-    # Normalizar las columnas de texto clave: a minúsculas y sin espacios extra.
+    # Normalize key text columns: to lowercase and remove extra spaces.
     text_cols_to_normalize = [
         MasterDataColumns.COMPANY, MasterDataColumns.MODEL, MasterDataColumns.YEAR,
         MasterDataColumns.CLIP_TYPE, MasterDataColumns.TEMPLATE
@@ -89,16 +89,16 @@ def load_and_prepare_master_data(file_path: str) -> pd.DataFrame:
     for col in text_cols_to_normalize:
         df_cleaned[col] = df_cleaned[col].str.lower().str.strip()
 
-    # --- Creación de Columnas Derivadas para Matching ---
+    # --- Creation of Derived Columns for Matching ---
 
-    # Crear una columna 'Template_Normalized' para búsquedas rápidas y exactas.
-    # Ej: "MS-123 AB" -> "MS123AB"
+    # Create a 'Template_Normalized' column for fast and exact searches.
+    # E.g.: "MS-123 AB" -> "MS123AB"
     df_cleaned[MasterDataColumns.NORMALIZED_TEMPLATE] = df_cleaned[MasterDataColumns.TEMPLATE].apply(normalize_ref_no)
     
-    # Crear una columna normalizada para 'ForcedMatchSKU' si existe.
+    # Create a normalized column for 'ForcedMatchSKU' if it exists.
     if MasterDataColumns.FORCED_MATCH_SKU in df_cleaned.columns:
         df_cleaned['_normalized_forced_sku'] = df_cleaned[MasterDataColumns.FORCED_MATCH_SKU].str.strip().str.lower()
 
-    logger.info(f"DataFrame maestro preparado. Total de filas: {len(df_cleaned)}. Columnas: {list(df_cleaned.columns)}")
+    logger.info(f"Master DataFrame prepared. Total rows: {len(df_cleaned)}. Columns: {list(df_cleaned.columns)}")
     
     return df_cleaned

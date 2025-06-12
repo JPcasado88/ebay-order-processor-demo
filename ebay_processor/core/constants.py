@@ -1,28 +1,28 @@
 # ebay_processor/core/constants.py
 """
-Módulo de Constantes del Negocio.
+Business Constants Module.
 
-Este archivo centraliza todas las constantes, "valores mágicos" y
-configuraciones estáticas utilizadas a lo largo de la aplicación.
-Hacer esto mejora la mantenibilidad y la claridad del código, ya que
-la lógica de negocio clave se define en un solo lugar.
+This file centralizes all constants, "magic values" and
+static configurations used throughout the application.
+Doing this improves maintainability and code clarity, as
+key business logic is defined in a single place.
 """
 
 from typing import Set, Tuple
 
 # --- eBay API ---
-EBAY_SITE_ID_UK = '3'  # Corresponde al sitio de eBay Reino Unido.
-UK_TIMEZONE = 'Europe/London'  # Timezone para cálculos de fechas de envío en UK.
+EBAY_SITE_ID_UK = '3'  # Corresponds to eBay UK site.
+UK_TIMEZONE = 'Europe/London'  # Timezone for shipping date calculations in UK.
 
-# --- Envío y Courier ---
+# --- Shipping and Courier ---
 DEFAULT_COURIER = "Hermes"
 DEFAULT_BARCODE_TYPE = "CODE93"
 NEXT_DAY_SERVICE_NAME = "UK NEXT DAY DELIVERY"
 STANDARD_SERVICE_NAME = "UK STANDARD DELIVERY"
 
-# Prefijos de códigos postales que usualmente tienen un servicio de envío diferente
-# o más lento (e.g., Highlands, Islands). Se usa para determinar el tipo de servicio.
-# Es una tupla para un chequeo `startswith` eficiente.
+# Postcode prefixes that usually have a different shipping service
+# or slower delivery (e.g., Highlands, Islands). Used to determine service type.
+# It's a tuple for efficient `startswith` checking.
 HIGHLANDS_AND_ISLANDS_POSTCODES: Tuple[str, ...] = (
     'BT', 'IV', 'AB', 'KA27', 'KA28', 'PA20', 'PA38', 'PA41', 'PA42', 'PA43', 'PA44',
     'PA45', 'PA46', 'PA47', 'PA48', 'PA49', 'PA60', 'PA61', 'PA62', 'PA63', 'PA64',
@@ -33,30 +33,30 @@ HIGHLANDS_AND_ISLANDS_POSTCODES: Tuple[str, ...] = (
     'PH50', 'HS', 'ZE', 'IM', 'GY', 'JE', 'KW'
 )
 
-# --- Atributos de Producto ---
+# --- Product Attributes ---
 
-# Un set para búsquedas rápidas (`if color in ALLOWED_COLORS:`).
-# Centraliza todos los colores reconocidos por el sistema.
+# A set for fast lookups (`if color in ALLOWED_COLORS:`).
+# Centralizes all colors recognized by the system.
 ALLOWED_COLORS: Set[str] = {
     'red', 'blue', 'green', 'grey', 'silver', 'yellow', 'white',
     'orange', 'purple', 'brown', 'pink', 'black', 'beige', 'tan'
 }
 
-# Tipos de alfombra reconocidos. Usado para estandarizar la salida.
+# Recognized carpet types. Used to standardize output.
 class Carpet:
     VELOUR = 'CTVEL'
     RUBBER_STD = 'RUBSTD'
     RUBBER_HD = 'RUBHD'
     STANDARD = 'CT65'
 
-# --- ¡CLASE AÑADIDA! ---
-# Tipos de bordado reconocidos.
+# --- ADDED CLASS! ---
+# Recognized embroidery types.
 class Embroidery:
     DOUBLE_STITCH = "Double Stitch"
     NONE = ""
 
-# --- Nombres de Archivos y Hojas de Cálculo ---
-INFO_HEADER_TAG = "#INFO" # Etiqueta usada en la primera fila de algunos archivos de tracking.
+# --- File Names and Spreadsheets ---
+INFO_HEADER_TAG = "#INFO"  # Tag used in the first row of some tracking files.
 UNMATCHED_SHEET_TITLE = "Unmatched Items"
 TRACKING_SHEET_TITLE = "Tracking"
 RUN_SHEET_TITLE = "RUN"
@@ -64,9 +64,9 @@ RUN24H_SHEET_TITLE = "RUN24H"
 COURIER_MASTER_SHEET_TITLE = "COURIER_MASTER"
 
 
-# --- Columnas Clave de DataFrames (para consistencia entre servicios) ---
-# Usadas para asegurar que los DataFrames siempre tengan las columnas requeridas
-# antes de ser procesados o generados.
+# --- Key DataFrame Columns (for consistency between services) ---
+# Used to ensure DataFrames always have the required columns
+# before being processed or generated.
 class MasterDataColumns:
     TEMPLATE = 'Template'
     COMPANY = 'COMPANY'
@@ -77,8 +77,8 @@ class MasterDataColumns:
     CLIP_TYPE = 'Type'
     FORCED_MATCH_SKU = 'ForcedMatchSKU'
     
-    # Columnas renombradas internamente
+    # Internally renamed columns
     INTERNAL_CLIP_COUNT = 'NO OF CLIPS'
     
-    # Columnas normalizadas/generadas para procesamiento
+    # Normalized/generated columns for processing
     NORMALIZED_TEMPLATE = 'Template_Normalized'

@@ -1,9 +1,9 @@
 # ebay_processor/__init__.py
 """
-Punto de Entrada de la Aplicación y Application Factory.
+Application Entry Point and Application Factory.
 
-Este archivo contiene la función `create_app`, que es la responsable de
-construir y configurar la instancia de la aplicación Flask.
+This file contains the `create_app` function, which is responsible for
+building and configuring the Flask application instance.
 """
 
 import logging
@@ -17,39 +17,39 @@ from flask_session import Session
 
 
 
-# Importamos nuestra clase de configuración
+# Import our configuration class
 from .config import Config
 
-# Importamos las funciones de limpieza programada
+# Import scheduled cleanup functions
 from .persistence.process_store import ProcessStore
 from .utils.file_utils import cleanup_directory
 
 
 def create_app(config_class=Config):
     """
-    Application Factory: Crea y configura la instancia de la aplicación Flask.
+    Application Factory: Creates and configures the Flask application instance.
     """
     app = Flask(__name__, instance_relative_config=True)
 
-    # 1. Cargar la configuración
-    # --------------------------
+    # 1. Load configuration
+    # ---------------------
     app.config.from_object(config_class)
     
-    # Asegurarse de que los directorios necesarios existan
+    # Ensure necessary directories exist
     for path_key in ['LOG_DIR', 'OUTPUT_DIR', 'FLASK_SESSION_DIR', 'PROCESS_STORE_DIR']:
         path = app.config.get(path_key)
         if path:
             os.makedirs(path, exist_ok=True)
         else:
-            # Si una ruta esencial no está configurada, es un error fatal.
-            raise ValueError(f"La ruta de configuración '{path_key}' no está definida.")
+            # If an essential path is not configured, it's a fatal error.
+            raise ValueError(f"Configuration path '{path_key}' is not defined.")
     
     # Set the session file directory to the correct path
     app.config['SESSION_FILE_DIR'] = app.config['FLASK_SESSION_DIR']
 
-    # 2. Configurar el Logging
-    # ------------------------
-    # Se configura un log que rota para evitar que los archivos crezcan indefinidamente.
+    # 2. Configure Logging
+    # --------------------
+    # Configure a rotating log to prevent files from growing indefinitely.
     log_file = os.path.join(app.config['LOG_DIR'], 'app.log')
     file_handler = RotatingFileHandler(log_file, maxBytes=10240, backupCount=10)
     file_handler.setFormatter(logging.Formatter(
@@ -58,10 +58,10 @@ def create_app(config_class=Config):
     file_handler.setLevel(logging.INFO)
     app.logger.addHandler(file_handler)
     app.logger.setLevel(logging.INFO)
-    app.logger.info('Aplicación eBay Order Processor iniciándose...')
+    app.logger.info('eBay Order Processor application starting...')
 
-    # 3. Configurar la Gestión de Sesiones (VOLVEMOS A LA FORMA SIMPLE)
-    # ------------------------------------
+    # 3. Configure Session Management (BACK TO SIMPLE APPROACH)
+    # ----------------------------------------------------------
     Session(app)
 
     # 3.5. Add context processor to make 'now' available in all templates
@@ -71,14 +71,14 @@ def create_app(config_class=Config):
         return {'now': datetime.now()}
 
 
-    # 4. Registrar los Blueprints
-    # ---------------------------
-    # Aquí es donde conectamos todas nuestras rutas a la aplicación.
+    # 4. Register Blueprints
+    # ----------------------
+    # This is where we connect all our routes to the application.
     from .web.routes.auth import auth_bp
     from .web.routes.processing import processing_bp
     from .web.routes.files import files_bp
     from .web.routes.tracking import tracking_bp
-    from .web.routes.health import health_bp  # Asumiendo que crearemos uno para /health
+    from .web.routes.health import health_bp  # Assuming we'll create one for /health
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(processing_bp, url_prefix='/')
@@ -86,15 +86,15 @@ def create_app(config_class=Config):
     app.register_blueprint(tracking_bp, url_prefix='/tracking')
     app.register_blueprint(health_bp, url_prefix='/')
 
-    app.logger.info("Blueprints registrados exitosamente.")
+    app.logger.info("Blueprints registered successfully.")
 
-    # 5. Configurar y Iniciar el Planificador de Tareas (Scheduler)
-    # -----------------------------------------------------------
-    # Usamos APScheduler para ejecutar tareas de limpieza periódicas en segundo plano.
+    # 5. Configure and Start Task Scheduler
+    # --------------------------------------
+    # We use APScheduler to run periodic cleanup tasks in the background.
     if app.config.get('ENABLE_SCHEDULER', True):
         scheduler = BackgroundScheduler(daemon=True)
         
-        # Tarea 1: Limpiar archivos de sesión antiguos.
+        # Task 1: Clean up old session files.
         scheduler.add_job(
             func=cleanup_directory,
             trigger='interval',
@@ -108,9 +108,9 @@ def create_app(config_class=Config):
             replace_existing=True
         )
 
-        # Tarea 2: Limpiar archivos de estado de procesos antiguos.
+        # Task 2: Clean up old process state files.
         def cleanup_process_store_job():
-            with app.app_context(): # Necesario para que el job acceda a la config
+            with app.app_context(): # Necessary for the job to access config
                 store = ProcessStore(app.config['PROCESS_STORE_DIR'])
                 store.scheduled_cleanup(app.config.get('PROCESS_FILE_RETENTION_HOURS', 48))
 
@@ -123,9 +123,9 @@ def create_app(config_class=Config):
         )
         
         scheduler.start()
-        app.logger.info("Scheduler iniciado con tareas de limpieza programadas.")
+        app.logger.info("Scheduler started with scheduled cleanup tasks.")
 
-        # Es una buena práctica apagar el scheduler de forma limpia cuando la app se cierra.
+        # It's good practice to shut down the scheduler cleanly when the app closes.
         import atexit
         atexit.register(lambda: scheduler.shutdown())
 

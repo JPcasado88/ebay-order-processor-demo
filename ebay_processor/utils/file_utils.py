@@ -1,10 +1,10 @@
 # ebay_processor/utils/file_utils.py
 """
-Módulo de Utilidades de Archivos y Sistema de Ficheros.
+File and File System Utilities Module.
 
-Proporciona funciones de ayuda para interactuar con el sistema de archivos,
-como cargar datos desde ficheros, limpiar directorios y manejar rutas de
-manera segura y con un logging adecuado.
+Provides helper functions for interacting with the file system,
+such as loading data from files, cleaning directories and handling paths
+safely and with proper logging.
 """
 import os
 import shutil
@@ -22,22 +22,22 @@ logger = logging.getLogger(__name__)
 
 def load_csv_to_dataframe(file_path: str, required_columns: Optional[List[str]] = None, **kwargs) -> pd.DataFrame:
     """
-    Carga un archivo CSV en un DataFrame de pandas con manejo de errores robusto
-    y validación opcional de columnas.
+    Loads a CSV file into a pandas DataFrame with robust error handling
+    and optional column validation.
 
     Args:
-        file_path: La ruta al archivo CSV.
-        required_columns: Una lista opcional de nombres de columna que deben existir.
-        **kwargs: Argumentos adicionales para pd.read_csv (e.g., sep=',', encoding='utf-8').
+        file_path: The path to the CSV file.
+        required_columns: An optional list of column names that must exist.
+        **kwargs: Additional arguments for pd.read_csv (e.g., sep=',', encoding='utf-8').
 
     Returns:
-        Un DataFrame de pandas con los datos del CSV.
+        A pandas DataFrame with the CSV data.
 
     Raises:
-        DataLoadingError: Si el archivo no se encuentra o está vacío.
-        InvalidDataFormatError: Si faltan columnas requeridas.
+        DataLoadingError: If the file is not found or is empty.
+        InvalidDataFormatError: If required columns are missing.
     """
-    logger.info(f"Intentando cargar CSV desde: {file_path}")
+    logger.info(f"Attempting to load CSV from: {file_path}")
     try:
         df = pd.read_csv(file_path, **kwargs)
         
@@ -45,22 +45,22 @@ def load_csv_to_dataframe(file_path: str, required_columns: Optional[List[str]] 
             missing_cols = [col for col in required_columns if col not in df.columns]
             if missing_cols:
                 raise InvalidDataFormatError(
-                    f"El archivo CSV '{os.path.basename(file_path)}' no contiene las columnas requeridas.",
+                    f"CSV file '{os.path.basename(file_path)}' does not contain required columns.",
                     file_path=file_path,
                     missing_columns=missing_cols
                 )
         
-        logger.info(f"CSV '{os.path.basename(file_path)}' cargado exitosamente con {len(df)} filas.")
+        logger.info(f"CSV '{os.path.basename(file_path)}' loaded successfully with {len(df)} rows.")
         return df
         
     except FileNotFoundError:
-        raise DataLoadingError(f"Archivo de datos no encontrado en la ruta: '{file_path}'.", file_path=file_path)
+        raise DataLoadingError(f"Data file not found at path: '{file_path}'.", file_path=file_path)
     except pd.errors.EmptyDataError:
-        raise DataLoadingError(f"El archivo de datos '{os.path.basename(file_path)}' está vacío.", file_path=file_path)
+        raise DataLoadingError(f"Data file '{os.path.basename(file_path)}' is empty.", file_path=file_path)
     except Exception as e:
-        raise DataLoadingError(f"Error inesperado al parsear el archivo CSV '{file_path}': {e}", file_path=file_path) from e
+        raise DataLoadingError(f"Unexpected error parsing CSV file '{file_path}': {e}", file_path=file_path) from e
 
-### CAMBIO AQUÍ: El nombre de la función ahora es el correcto.
+### CHANGE HERE: The function name is now correct.
 def cleanup_directory(
     target_dir: str,
     pattern: str = '*',
@@ -68,20 +68,20 @@ def cleanup_directory(
     log_prefix: str = ""
 ) -> Tuple[int, int]:
     """
-    Utilidad robusta para eliminar archivos que coinciden con un patrón dentro de un directorio,
-    con una opción de antigüedad máxima.
+    Robust utility to delete files matching a pattern within a directory,
+    with an optional maximum age option.
 
     Args:
-        target_dir: El directorio donde se realizará la limpieza.
-        pattern: El patrón de glob para encontrar archivos (e.g., '*.tmp', 'process_*.pkl').
-        max_age_hours: Si se especifica, solo se borrarán los archivos más antiguos que este número de horas.
-        log_prefix: Un prefijo para los mensajes de log para dar contexto.
+        target_dir: The directory where cleanup will be performed.
+        pattern: The glob pattern to find files (e.g., '*.tmp', 'process_*.pkl').
+        max_age_hours: If specified, only files older than this number of hours will be deleted.
+        log_prefix: A prefix for log messages to provide context.
 
     Returns:
-        Una tupla con (archivos_borrados, errores_encontrados).
+        A tuple with (files_deleted, errors_encountered).
     """
     if not target_dir or not os.path.isdir(target_dir):
-        logger.error(f"{log_prefix} Directorio para limpieza no encontrado o inválido: {target_dir}")
+        logger.error(f"{log_prefix} Directory for cleanup not found or invalid: {target_dir}")
         return 0, 1
 
     deleted_count, error_count = 0, 0
@@ -89,10 +89,10 @@ def cleanup_directory(
     
     if max_age_hours:
         cutoff_time = now - (max_age_hours * 3600)
-        logger.info(f"{log_prefix} Limpiando archivos con patrón '{pattern}' en '{target_dir}' más antiguos de {max_age_hours} horas.")
+        logger.info(f"{log_prefix} Cleaning files with pattern '{pattern}' in '{target_dir}' older than {max_age_hours} hours.")
     else:
         cutoff_time = None
-        logger.info(f"{log_prefix} Limpiando todos los archivos con patrón '{pattern}' en '{target_dir}'.")
+        logger.info(f"{log_prefix} Cleaning all files with pattern '{pattern}' in '{target_dir}'.")
 
     try:
         for item_path in glob.glob(os.path.join(target_dir, pattern)):
@@ -101,15 +101,15 @@ def cleanup_directory(
                     if cutoff_time is None or os.path.getmtime(item_path) < cutoff_time:
                         os.remove(item_path)
                         deleted_count += 1
-                        logger.debug(f"{log_prefix} Archivo eliminado: {item_path}")
+                        logger.debug(f"{log_prefix} File deleted: {item_path}")
             except FileNotFoundError:
-                logger.warning(f"{log_prefix} Archivo no encontrado durante la limpieza (ya borrado?): {item_path}")
+                logger.warning(f"{log_prefix} File not found during cleanup (already deleted?): {item_path}")
             except Exception as e:
-                logger.error(f"{log_prefix} Error al borrar el archivo {item_path}: {e}")
+                logger.error(f"{log_prefix} Error deleting file {item_path}: {e}")
                 error_count += 1
     except Exception as e:
-        logger.error(f"CRÍTICO: No se pudo listar el directorio '{target_dir}' para limpieza: {e}", exc_info=True)
+        logger.error(f"CRITICAL: Could not list directory '{target_dir}' for cleanup: {e}", exc_info=True)
         error_count += 1
 
-    logger.info(f"{log_prefix} Limpieza finalizada. Borrados: {deleted_count}, Errores: {error_count}.")
+    logger.info(f"{log_prefix} Cleanup completed. Deleted: {deleted_count}, Errors: {error_count}.")
     return deleted_count, error_count

@@ -1,13 +1,13 @@
 # ebay_processor/persistence/process_store.py
 """
-Módulo de Persistencia de Estado de Procesos.
+Process State Persistence Module.
 
-Contiene la clase ProcessStore, que es responsable de guardar,
-recuperar y gestionar el estado de los trabajos de procesamiento en segundo plano.
+Contains the ProcessStore class, which is responsible for saving,
+retrieving and managing the state of background processing jobs.
 
-Utiliza el sistema de archivos para la persistencia, guardando cada estado de
-proceso en su propio archivo pickle. Esto es adecuado para entornos de despliegue
-sin estado (como muchas plataformas en la nube) donde la memoria del proceso no es persistente.
+Uses the file system for persistence, saving each process state
+in its own pickle file. This is suitable for stateless deployment environments
+(like many cloud platforms) where process memory is not persistent.
 """
 
 import logging
@@ -18,7 +18,7 @@ import threading
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any, List
 
-# Reutilizamos nuestra utilidad de limpieza de directorios
+# Reuse our directory cleanup utility
 from ..utils.file_utils import cleanup_directory
 from ..core.exceptions import OrderProcessingError
 
@@ -26,50 +26,50 @@ logger = logging.getLogger(__name__)
 
 class ProcessStore:
     """
-    Gestiona el almacenamiento del estado de los procesos en archivos pickle.
-    Las operaciones de escritura son atómicas para prevenir la corrupción de datos.
+    Manages process state storage in pickle files.
+    Write operations are atomic to prevent data corruption.
     """
     def __init__(self, storage_dir: str):
         """
-        Inicializa el almacén de procesos.
+        Initializes the process store.
 
         Args:
-            storage_dir: El directorio donde se guardarán los archivos de estado.
+            storage_dir: The directory where state files will be saved.
 
         Raises:
-            ValueError: Si no se proporciona un directorio de almacenamiento.
+            ValueError: If no storage directory is provided.
         """
         if not storage_dir:
-            raise ValueError("Se debe proporcionar un directorio de almacenamiento para ProcessStore.")
+            raise ValueError("A storage directory must be provided for ProcessStore.")
         
         self.storage_dir = storage_dir
-        self.lock = threading.Lock()  # Lock para asegurar operaciones de archivo seguras entre hilos.
+        self.lock = threading.Lock()  # Lock to ensure thread-safe file operations.
         
         try:
             os.makedirs(storage_dir, exist_ok=True)
         except OSError as e:
-            logger.critical(f"No se pudo crear el directorio de almacenamiento de procesos: {storage_dir}. Error: {e}")
-            raise OrderProcessingError(f"Fallo al crear el directorio de almacenamiento: {e}") from e
+            logger.critical(f"Could not create process storage directory: {storage_dir}. Error: {e}")
+            raise OrderProcessingError(f"Failed to create storage directory: {e}") from e
 
     def _get_process_path(self, process_id: str) -> str:
-        """Construye la ruta completa al archivo para un ID de proceso dado."""
-        # Sanear el ID del proceso para evitar path traversal.
-        # Solo permite caracteres alfanuméricos, guiones bajos y puntos.
+        """Builds the full path to the file for a given process ID."""
+        # Sanitize the process ID to prevent path traversal.
+        # Only allow alphanumeric characters, underscores and dots.
         safe_filename = "".join(c for c in process_id if c.isalnum() or c in ['_', '.'])
         if not safe_filename:
-            raise ValueError("ID de proceso inválido o vacío.")
+            raise ValueError("Invalid or empty process ID.")
         return os.path.join(self.storage_dir, f"process_{safe_filename}.pkl")
 
     def get(self, process_id: str, default: Any = None) -> Optional[Dict[str, Any]]:
         """
-        Recupera la información de un proceso desde su archivo.
+        Retrieves process information from its file.
 
         Args:
-            process_id: El ID del proceso a recuperar.
-            default: El valor a devolver si el proceso no se encuentra.
+            process_id: The ID of the process to retrieve.
+            default: The value to return if the process is not found.
 
         Returns:
-            Un diccionario con la información del proceso, o el valor `default`.
+            A dictionary with the process information, or the `default` value.
         """
         file_path = self._get_process_path(process_id)
         
@@ -77,32 +77,32 @@ class ProcessStore:
             return default
             
         try:
-            # Asegurarse de que el archivo no esté vacío antes de intentar leerlo.
+            # Make sure the file is not empty before attempting to read it.
             if os.path.getsize(file_path) > 0:
                 with open(file_path, 'rb') as f:
                     return pickle.load(f)
-            # Si el archivo está vacío, tratarlo como si no existiera.
-            logger.warning(f"El archivo de proceso {file_path} está vacío. Será eliminado.")
+            # If the file is empty, treat it as if it didn't exist.
+            logger.warning(f"Process file {file_path} is empty. It will be deleted.")
             self.delete(process_id)
             return default
         except (EOFError, pickle.UnpicklingError) as e:
-            logger.error(f"Error al deserializar {file_path}. El archivo puede estar corrupto y será eliminado. Error: {e}")
+            logger.error(f"Error deserializing {file_path}. The file may be corrupted and will be deleted. Error: {e}")
             self.delete(process_id)
             return default
         except Exception as e:
-            logger.error(f"Error irrecuperable al leer el proceso {process_id}: {e}", exc_info=True)
+            logger.error(f"Unrecoverable error reading process {process_id}: {e}", exc_info=True)
             return default
 
     def update(self, process_id: str, info: Dict[str, Any]):
         """
-        Actualiza y guarda la información de un proceso en un archivo de forma atómica.
+        Updates and saves process information to a file atomically.
 
-        Utiliza una escritura en un archivo temporal y luego lo renombra para evitar
-        dejar un archivo corrupto si el proceso falla a mitad de la escritura.
+        Uses a write to a temporary file and then renames it to avoid
+        leaving a corrupted file if the process fails mid-write.
 
         Args:
-            process_id: El ID del proceso a actualizar.
-            info: El diccionario con la nueva información del proceso.
+            process_id: The ID of the process to update.
+            info: The dictionary with the new process information.
         """
         with self.lock:
             file_path = self._get_process_path(process_id)
@@ -110,11 +110,11 @@ class ProcessStore:
             try:
                 with open(temp_file_path, 'wb') as f:
                     pickle.dump(info, f, protocol=pickle.HIGHEST_PROTOCOL)
-                # La operación 'move' es atómica en la mayoría de los sistemas operativos.
+                # The 'move' operation is atomic on most operating systems.
                 shutil.move(temp_file_path, file_path)
             except Exception as e:
-                logger.error(f"Error al actualizar el proceso {process_id} en disco: {e}", exc_info=True)
-                # Limpiar el archivo temporal si la operación falló.
+                logger.error(f"Error updating process {process_id} to disk: {e}", exc_info=True)
+                # Clean up the temporary file if the operation failed.
                 if os.path.exists(temp_file_path):
                     try:
                         os.remove(temp_file_path)
@@ -123,31 +123,31 @@ class ProcessStore:
 
     def delete(self, process_id: str) -> bool:
         """
-        Elimina el archivo de un proceso del disco.
+        Deletes a process file from disk.
 
         Args:
-            process_id: El ID del proceso a eliminar.
+            process_id: The ID of the process to delete.
 
         Returns:
-            True si el archivo fue eliminado, False en caso contrario.
+            True if the file was deleted, False otherwise.
         """
         with self.lock:
             file_path = self._get_process_path(process_id)
             try:
                 if os.path.exists(file_path):
                     os.remove(file_path)
-                    logger.info(f"Archivo de proceso eliminado: {file_path}")
+                    logger.info(f"Process file deleted: {file_path}")
                     return True
             except Exception as e:
-                logger.error(f"Error al eliminar el archivo de proceso {file_path}: {e}", exc_info=True)
+                logger.error(f"Error deleting process file {file_path}: {e}", exc_info=True)
             return False
 
     def scheduled_cleanup(self, max_age_hours: int = 24):
         """
-        Elimina los archivos de proceso que son más antiguos que una edad determinada.
-        Diseñado para ser llamado por un planificador (scheduler).
+        Deletes process files that are older than a specified age.
+        Designed to be called by a scheduler.
         """
-        logger.info(f"Iniciando limpieza programada de archivos de proceso más antiguos de {max_age_hours} horas.")
+        logger.info(f"Starting scheduled cleanup of process files older than {max_age_hours} hours.")
         cleanup_directory(
             target_dir=self.storage_dir,
             pattern='process_*.pkl',

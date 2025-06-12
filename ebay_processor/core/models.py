@@ -1,5 +1,5 @@
 """
-Modelos de datos y estructuras centrales del dominio
+Core domain data models and structures
 """
 from dataclasses import dataclass
 from typing import List, Optional, Dict
@@ -7,7 +7,7 @@ from datetime import datetime
 
 @dataclass
 class OrderItem:
-    """Representa un item individual de una orden"""
+    """Represents an individual item from an order"""
     order_id: str
     item_number: str
     transaction_id: str
@@ -20,7 +20,7 @@ class OrderItem:
     
 @dataclass
 class TemplateMatch:
-    """Resultado de matching con el catálogo"""
+    """Result of matching with the catalog"""
     template: str
     company: str
     model: str
@@ -33,7 +33,7 @@ class TemplateMatch:
 
 @dataclass
 class ProcessingResult:
-    """Resultado del procesamiento de órdenes"""
+    """Result of order processing"""
     expedited_orders: List[OrderItem]
     standard_orders: List[OrderItem]
     unmatched_items: List[Dict]

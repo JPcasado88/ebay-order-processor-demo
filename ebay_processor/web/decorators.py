@@ -1,41 +1,41 @@
 # ebay_processor/web/decorators.py
 """
-Módulo de Decoradores Personalizados de Flask.
+Custom Flask Decorators Module.
 
-Este archivo contiene decoradores que se pueden aplicar a las funciones de vista (rutas)
-para añadir funcionalidades transversales, como la comprobación de autenticación.
+This file contains decorators that can be applied to view functions (routes)
+to add cross-cutting functionality, such as authentication checking.
 """
 from functools import wraps
 from flask import session, redirect, url_for, flash
 
 def login_required(f):
     """
-    Decorador que verifica si un usuario ha iniciado sesión.
+    Decorator that verifies if a user has logged in.
 
-    Si el usuario no está en la sesión (identificado por la presencia de 'user_id'),
-    lo redirige a la página de inicio de sesión.
+    If the user is not in the session (identified by the presence of 'user_id'),
+    redirects them to the login page.
 
-    Este decorador debe aplicarse a todas las rutas que requieran
-    que el usuario esté autenticado.
+    This decorator should be applied to all routes that require
+    the user to be authenticated.
 
-    Uso:
+    Usage:
         @app.route('/secret-page')
         @login_required
         def secret_page():
-            return "Solo para usuarios logueados."
+            return "Only for logged-in users."
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # La clave 'user_id' es la que establecemos en la ruta de login exitoso.
+        # The 'user_id' key is what we set in the successful login route.
         if 'user_id' not in session:
-            # Si no se encuentra, mostramos un mensaje y redirigimos.
-            flash('Por favor, inicia sesión para acceder a esta página.', 'warning')
+            # If not found, show a message and redirect.
+            flash('Please log in to access this page.', 'warning')
             
-            # Usamos url_for('auth.login') para apuntar a la función 'login'
-            # dentro del Blueprint 'auth'.
+            # Use url_for('auth.login') to point to the 'login' function
+            # within the 'auth' Blueprint.
             return redirect(url_for('auth.login'))
         
-        # Si el usuario está en la sesión, la función original (la ruta) se ejecuta.
+        # If the user is in the session, the original function (the route) executes.
         return f(*args, **kwargs)
     
     return decorated_function

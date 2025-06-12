@@ -28,30 +28,30 @@ def find_best_match(
         filtered_df = _apply_bootmat_filter(title, matlist_df)
 
         if filtered_df.empty:
-            logger.debug(f"No hay candidatos de catálogo para el título '{title[:50]}...' después del filtro de bootmat.")
+            logger.debug(f"No catalog candidates for title '{title[:50]}...' after bootmat filter.")
             return None
 
         forced_match = _match_by_forced_sku(sku, filtered_df)
         if forced_match is not None:
-            logger.info(f"Éxito (ForcedMatch): SKU '{sku}' -> Template '{forced_match.get('Template')}'")
+            logger.info(f"Success (ForcedMatch): SKU '{sku}' -> Template '{forced_match.get('Template')}'")
             return forced_match
 
         sku_identifier_match = _match_by_sku_identifier(sku, filtered_df)
         if sku_identifier_match is not None:
-            logger.info(f"Éxito (Identifier): SKU '{sku}' -> Template '{sku_identifier_match.get('Template')}'")
+            logger.info(f"Success (Identifier): SKU '{sku}' -> Template '{sku_identifier_match.get('Template')}'")
             return sku_identifier_match
         
         if car_details:
             title_match = _match_by_title_details(car_details, filtered_df)
             if title_match is not None:
-                logger.info(f"Éxito (Title Fallback): Título '{title[:50]}...' -> Template '{title_match.get('Template')}'")
+                logger.info(f"Success (Title Fallback): Title '{title[:50]}...' -> Template '{title_match.get('Template')}'")
                 return title_match
 
-        logger.warning(f"SIN COINCIDENCIA: SKU='{sku}', Título='{title[:50]}...'")
+        logger.warning(f"NO MATCH: SKU='{sku}', Title='{title[:50]}...'")
         return None
 
     except Exception as e:
-        raise SKUMatchingError(f"Excepción inesperada en el motor de matching: {e}", sku=sku, product_title=title) from e
+        raise SKUMatchingError(f"Unexpected exception in matching engine: {e}", sku=sku, product_title=title) from e
 
 
 def _apply_bootmat_filter(title: str, catalog_df: pd.DataFrame) -> pd.DataFrame:
@@ -83,9 +83,9 @@ def _match_by_forced_sku(sku: str, catalog_df: pd.DataFrame) -> Optional[Dict[st
 
 
 def _match_by_sku_identifier(sku: str, catalog_df: pd.DataFrame) -> Optional[Dict[str, Any]]:
-    # La importación local redundante ha sido eliminada.
+    # Redundant local import has been removed.
     
-    # Ahora se usa la función importada en la parte superior del archivo.
+    # Now uses the function imported at the top of the file.
     identifier = extract_sku_identifier(sku)
     if not identifier:
         return None

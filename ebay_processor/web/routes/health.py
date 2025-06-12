@@ -1,6 +1,6 @@
 # ebay_processor/web/routes/health.py
 """
-Ruta para la comprobación de estado (health check).
+Health check route.
 """
 from flask import Blueprint
 
@@ -9,7 +9,7 @@ health_bp = Blueprint('health', __name__)
 @health_bp.route('/health')
 def health_check():
     """
-    Endpoint simple para que las plataformas de despliegue (como Railway)
-    puedan verificar que la aplicación está en funcionamiento.
+    Simple endpoint for deployment platforms (like Railway)
+    to verify that the application is running.
     """
     return "OK", 200

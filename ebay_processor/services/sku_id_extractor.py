@@ -1,10 +1,10 @@
 # ebay_processor/services/sku_id_extractor.py
 """
-Servicio de Extracción de Identificadores de SKU.
+SKU Identifier Extraction Service.
 
-Este módulo contiene la lógica especializada para extraer el identificador
-de plantilla principal a partir de una cadena de SKU de producto, que puede
-tener múltiples formatos y variaciones.
+This module contains specialized logic for extracting the main template 
+identifier from a product SKU string, which can have multiple formats 
+and variations.
 """
 
 import logging
@@ -13,7 +13,7 @@ from typing import List
 
 logger = logging.getLogger(__name__)
 
-# Lista de palabras clave de colores, movida a nivel de módulo para reutilización.
+# Color keyword list, moved to module level for reuse.
 COLOR_KEYWORDS: List[str] = [
     'BLACK', 'BLUE', 'GREY', 'RED', 'GREEN', 'YELLOW', 
     'SILVER', 'WHITE', 'TRIM', 'SOLID', 'BEIGE', 'TAN', 'ORANGE',

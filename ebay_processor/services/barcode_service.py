@@ -1,19 +1,19 @@
 # ebay_processor/services/barcode_service.py
 """
-Servicio de Generación de Códigos de Barras.
+Barcode Generation Service.
 
-Este servicio encapsula toda la lógica para crear códigos de barras únicos
-para cada ítem de un pedido. Está diseñado para ser instanciado una vez
-por cada ejecución de procesamiento de órdenes, garantizando que los contadores
-y estados sean frescos para cada nuevo lote.
+This service encapsulates all the logic for creating unique barcodes
+for each item in an order. It's designed to be instantiated once
+per order processing execution, ensuring that counters
+and states are fresh for each new batch.
 
-Implementa un sistema de dos pasadas:
-1.  **Asignación de Base:** A cada ítem se le asigna un código de barras base
-    único globalmente dentro de la ejecución.
-2.  **Asignación Final:** Se revisan los códigos base y se añaden sufijos
-    numéricos a los ítems que pertenecen a pedidos con múltiples productos,
-    asegurando que cada producto individual tenga un código de barras final
-    absolutamente único para el picking.
+Implements a two-pass system:
+1.  **Base Assignment:** Each item is assigned a globally unique base barcode
+    within the execution.
+2.  **Final Assignment:** Base codes are reviewed and numeric suffixes
+    are added to items that belong to orders with multiple products,
+    ensuring that each individual product has an absolutely unique final
+    barcode for picking.
 """
 
 import logging
@@ -24,105 +24,105 @@ logger = logging.getLogger(__name__)
 
 class BarcodeService:
     """
-    Gestiona la generación de códigos de barras para una única ejecución de procesamiento.
+    Manages barcode generation for a single processing execution.
     """
     def __init__(self, store_initials_map: Dict[str, str]):
         """
-        Inicializa el servicio de códigos de barras.
+        Initializes the barcode service.
 
         Args:
-            store_initials_map: Un diccionario que mapea store_id a sus iniciales.
+            store_initials_map: A dictionary that maps store_id to their initials.
                                 E.g., {'MyStoreUK': 'MS', 'AnotherStore': 'AS'}.
         """
         if not store_initials_map:
-            logger.warning("El mapa de iniciales de tiendas está vacío. Se usarán fallbacks.")
+            logger.warning("Store initials map is empty. Fallbacks will be used.")
         self.store_initials_map = store_initials_map
-        self._row_counter = 1  # Contador que se incrementa por cada código base generado.
-        logger.info("BarcodeService instanciado y estado reiniciado.")
+        self._row_counter = 1  # Counter that increments for each generated base code.
+        logger.info("BarcodeService instantiated and state reset.")
 
     def _get_next_row_id(self) -> int:
-        """Obtiene el siguiente número de fila único para un código de barras."""
+        """Gets the next unique row number for a barcode."""
         current_id = self._row_counter
         self._row_counter += 1
         return current_id
 
     def _generate_base_barcode(self, store_id: str, date: datetime) -> str:
         """
-        Genera un código de barras base único en el formato: INICIALES+CONTADOR+FECHA.
-        Este es el código "base" antes de aplicar sufijos para múltiples ítems.
+        Generates a unique base barcode in the format: INITIALS+COUNTER+DATE.
+        This is the "base" code before applying suffixes for multiple items.
 
         Args:
-            store_id: El ID de la tienda para obtener las iniciales.
-            date: La fecha de la orden para formatear en el código.
+            store_id: The store ID to get the initials.
+            date: The order date to format in the code.
 
         Returns:
-            El código de barras base generado (e.g., "MS001230724").
+            The generated base barcode (e.g., "MS001230724").
         """
-        # Obtiene las iniciales de la tienda del mapa, con un fallback seguro.
+        # Gets store initials from the map, with a safe fallback.
         initials = self.store_initials_map.get(store_id, store_id[:2].upper() if store_id else 'XX')
         
         row_num = self._get_next_row_id()
         date_str = date.strftime('%d%m%y')
         
-        # Formatea el número de fila a 3 dígitos (001, 012, 123) para consistencia.
+        # Format the row number to 3 digits (001, 012, 123) for consistency.
         return f"{initials}{row_num:03d}{date_str}"
 
     def assign_base_barcodes(self, all_items: List[Dict[str, Any]], run_date: datetime):
         """
-        Primera pasada: Asigna un código de barras base a cada ítem en la lista.
-        Modifica los diccionarios de ítems en su lugar, añadiendo la clave 'AssignedBaseBarcode'.
+        First pass: Assigns a base barcode to each item in the list.
+        Modifies item dictionaries in place, adding the 'AssignedBaseBarcode' key.
 
         Args:
-            all_items: Lista de diccionarios, donde cada uno representa un ítem procesado.
-            run_date: La fecha de la ejecución actual para embeber en el código de barras.
+            all_items: List of dictionaries, where each represents a processed item.
+            run_date: The current execution date to embed in the barcode.
         """
-        logger.info(f"Iniciando Pasada 1: Asignando códigos de barras base a {len(all_items)} ítems.")
+        logger.info(f"Starting Pass 1: Assigning base barcodes to {len(all_items)} items.")
         for item in all_items:
             store_id = item.get('Store ID')
             if not store_id:
-                logger.error(f"Ítem con Order ID {item.get('ORDER ID')} no tiene 'Store ID'. No se puede generar barcode.")
+                logger.error(f"Item with Order ID {item.get('ORDER ID')} has no 'Store ID'. Cannot generate barcode.")
                 item['AssignedBaseBarcode'] = None
                 continue
             
             base_barcode = self._generate_base_barcode(store_id, run_date)
             item['AssignedBaseBarcode'] = base_barcode
-        logger.info("Pasada 1 completada.")
+        logger.info("Pass 1 completed.")
 
     def assign_final_barcodes(self, all_items: List[Dict[str, Any]]):
         """
-        Segunda pasada: Procesa los códigos de barras base y asigna un código de barras
-        final y único a cada ítem, añadiendo sufijos si es necesario.
-        Modifica los ítems en su lugar, añadiendo la clave 'FinalBarcode'.
+        Second pass: Processes base barcodes and assigns a final unique barcode
+        to each item, adding suffixes if necessary.
+        Modifies items in place, adding the 'FinalBarcode' key.
 
         Args:
-            all_items: La misma lista de ítems, ya procesada por `assign_base_barcodes`.
+            all_items: The same item list, already processed by `assign_base_barcodes`.
         """
-        logger.info(f"Iniciando Pasada 2: Asignando códigos de barras finales a {len(all_items)} ítems.")
+        logger.info(f"Starting Pass 2: Assigning final barcodes to {len(all_items)} items.")
         
-        # Agrupa los ítems por su Order ID para identificar pedidos con múltiples productos.
+        # Group items by their Order ID to identify orders with multiple products.
         order_groups: Dict[str, List[Dict[str, Any]]] = {}
         for item in all_items:
             order_id = item.get('ORDER ID')
             if order_id:
                 order_groups.setdefault(order_id, []).append(item)
             else:
-                # Caso anómalo: un ítem sin Order ID no puede ser procesado correctamente.
-                item['FinalBarcode'] = item.get('AssignedBaseBarcode') # Asignar el base como fallback
-                logger.warning(f"Ítem sin Order ID encontrado. No se puede aplicar lógica de sufijos.")
+                # Anomalous case: an item without Order ID cannot be processed correctly.
+                item['FinalBarcode'] = item.get('AssignedBaseBarcode') # Assign the base as fallback
+                logger.warning(f"Item without Order ID found. Cannot apply suffix logic.")
 
         for order_id, items_in_order in order_groups.items():
             if len(items_in_order) == 1:
-                # Si solo hay un ítem en el pedido, el código final es el mismo que el base.
+                # If there's only one item in the order, the final code is the same as the base.
                 item = items_in_order[0]
                 item['FinalBarcode'] = item.get('AssignedBaseBarcode')
             else:
-                # Si hay múltiples ítems, se añade un sufijo numérico a cada uno.
-                # Se ordena por SKU para que los sufijos sean consistentes entre ejecuciones.
+                # If there are multiple items, add a numeric suffix to each one.
+                # Sort by SKU so suffixes are consistent between executions.
                 sorted_items = sorted(items_in_order, key=lambda x: x.get('Raw SKU', ''))
                 for i, item in enumerate(sorted_items):
                     base_barcode = item.get('AssignedBaseBarcode')
-                    suffix = f"{i + 1:02d}"  # Sufijo de dos dígitos: 01, 02, etc.
+                    suffix = f"{i + 1:02d}"  # Two-digit suffix: 01, 02, etc.
                     item['FinalBarcode'] = f"{base_barcode}{suffix}"
-                    logger.debug(f"Pedido multi-ítem {order_id}: Asignado {item['FinalBarcode']} a SKU {item.get('Raw SKU')}")
+                    logger.debug(f"Multi-item order {order_id}: Assigned {item['FinalBarcode']} to SKU {item.get('Raw SKU')}")
         
-        logger.info("Pasada 2 completada.")
+        logger.info("Pass 2 completed.")

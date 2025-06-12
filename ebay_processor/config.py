@@ -1,10 +1,10 @@
 # ebay_processor/config.py
 """
-Configuración de la Aplicación.
+Application Configuration.
 
-Carga las configuraciones desde variables de entorno.
-Es una clase simple que sirve como un único lugar de verdad para
-todas las variables de configuración.
+Loads configurations from environment variables.
+A simple class that serves as a single source of truth for
+all configuration variables.
 """
 
 import os
@@ -12,13 +12,13 @@ from datetime import timedelta
 
 class Config:
     """
-    Clase de configuración base. Carga valores desde el entorno.
+    Base configuration class. Loads values from environment.
     """
-    # Clave secreta para la seguridad de la sesión de Flask.
-    # Es CRÍTICO que esta sea una cadena larga, aleatoria y secreta.
+    # Secret key for Flask session security.
+    # It's CRITICAL that this is a long, random, and secret string.
     SECRET_KEY = os.environ.get('SECRET_KEY')
 
-    # Credenciales de administrador para el login.
+    # Administrator credentials for login.
     ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
     ADMIN_PASSWORD_HASH = os.environ.get('ADMIN_PASSWORD_HASH')
 
@@ -31,26 +31,26 @@ class Config:
     DEMO_MATLIST_CSV_PATH = os.environ.get('DEMO_MATLIST_CSV_PATH', 'data/sample_product_data.csv')
     DEMO_EBAY_CONFIG_JSON_PATH = os.environ.get('DEMO_EBAY_CONFIG_JSON_PATH', 'data/ebay_tokens_demo.json')
 
-    # Configuración de la sesión de Flask.
-    # Usamos el sistema de archivos para que sea persistente.
+    # Flask session configuration.
+    # We use the file system to make it persistent.
     SESSION_TYPE = 'filesystem'
     SESSION_PERMANENT = True
-    PERMANENT_SESSION_LIFETIME = timedelta(hours=24) # Las sesiones duran 24 horas.
+    PERMANENT_SESSION_LIFETIME = timedelta(hours=24) # Sessions last 24 hours.
     SESSION_USE_SIGNER = False # Temporarily disable signing to avoid bytes/string issues
     SESSION_KEY_PREFIX = 'ebay_session:'
     SESSION_FILE_DIR = os.environ.get('FLASK_SESSION_DIR', 'data/sessions')
     SESSION_FILE_THRESHOLD = 500
     SESSION_COOKIE_SECURE = False
     SESSION_COOKIE_HTTPONLY = True
-    # Rutas a directorios persistentes.
-    # Se recomienda que en producción, estas rutas apunten a un volumen montado.
-    # En create_app, se asegura que estos directorios existan.
+    # Paths to persistent directories.
+    # It's recommended that in production, these paths point to a mounted volume.
+    # In create_app, we ensure these directories exist.
     LOG_DIR = os.path.abspath(os.environ.get('LOG_DIR', 'data/logs'))
     OUTPUT_DIR = os.path.abspath(os.environ.get('OUTPUT_DIR', 'data/output'))
     FLASK_SESSION_DIR = os.path.abspath(os.environ.get('FLASK_SESSION_DIR', 'data/sessions'))
     PROCESS_STORE_DIR = os.path.abspath(os.environ.get('PROCESS_STORE_DIR', 'data/processes'))
     
-    # Rutas a archivos de datos de referencia.
+    # Paths to reference data files.
     # Dynamic paths based on demo mode
     if DEMO_MODE:
         MATLIST_CSV_PATH = os.environ.get('MATLIST_CSV_PATH', DEMO_MATLIST_CSV_PATH)
@@ -59,13 +59,13 @@ class Config:
         MATLIST_CSV_PATH = os.environ.get('MATLIST_CSV_PATH', 'data/ktypemaster3.csv')
         EBAY_CONFIG_JSON_PATH = os.environ.get('EBAY_CONFIG_JSON_PATH', 'data/ebay_tokens.json')
 
-    # Credenciales de la API de eBay.
+    # eBay API credentials.
     EBAY_APP_ID = os.environ.get('EBAY_APP_ID')
     EBAY_CERT_ID = os.environ.get('EBAY_CERT_ID')
     EBAY_DEV_ID = os.environ.get('EBAY_DEV_ID')
 
-    # Configuración de las tiendas.
-    # Iniciales usadas para nombrar archivos.
+    # Store configuration.
+    # Initials used for naming files.
     STORE_INITIALS = {
         'carmatsking_uk': 'MK',
         'car_mats_custom': 'CC',
@@ -76,13 +76,13 @@ class Config:
         'demo_store_1': 'DS1',
         'demo_store_2': 'DS2',
         'demo_store_3': 'DS3',
-        # Añade más tiendas aquí si es necesario
+        # Add more stores here if needed
     }
 
-    # Cuentas de tienda con sus refresh tokens.
-    # El formato es una lista de diccionarios. Se carga dinámicamente.
-    # El bucle buscará EBAY_STORE_1_ID, EBAY_STORE_1_REFRESH_TOKEN, etc.
-    # en el archivo .env hasta que no encuentre más.
+    # Store accounts with their refresh tokens.
+    # The format is a list of dictionaries. Loaded dynamically.
+    # The loop will look for EBAY_STORE_1_ID, EBAY_STORE_1_REFRESH_TOKEN, etc.
+    # in the .env file until it finds no more.
     EBAY_STORE_ACCOUNTS = []
     if not DEMO_MODE:
         # Real store accounts (only load in production mode)
@@ -106,12 +106,12 @@ class Config:
             {'account_id': 'demo_store_3', 'refresh_token': 'demo_refresh_token_3'}
         ]
 
-    # Configuración del planificador de tareas.
+    # Task scheduler configuration.
     ENABLE_SCHEDULER = os.environ.get('ENABLE_SCHEDULER', 'True').lower() == 'true'
     SESSION_LIFETIME_HOURS = 24
     SESSION_CLEANUP_INTERVAL_HOURS = 6
     PROCESS_FILE_RETENTION_HOURS = 48
     PROCESS_CLEANUP_INTERVAL_HOURS = 12
     
-    # Parámetros de procesamiento
+    # Processing parameters
     DEFAULT_ORDER_FETCH_DAYS = 29

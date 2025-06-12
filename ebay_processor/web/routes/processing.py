@@ -1,12 +1,12 @@
 # ebay_processor/web/routes/processing.py
 """
-Rutas de Procesamiento de Pedidos.
+Order Processing Routes.
 
-Este módulo contiene las rutas para la funcionalidad principal de la aplicación:
-- La página de inicio para configurar y lanzar un nuevo proceso.
-- El endpoint para iniciar el trabajo en segundo plano de forma asíncrona.
-- La página de progreso que consulta el estado del trabajo.
-- La página de resultados finales.
+This module contains routes for the main functionality of the application:
+- The home page to configure and launch a new process.
+- The endpoint to start background work asynchronously.
+- The progress page that polls for work status.
+- The final results page.
 """
 
 import logging
@@ -27,14 +27,14 @@ from flask import (
     current_app,
 )
 
-# Importamos el decorador de login y las dependencias de servicio
+# Import login decorator and service dependencies
 from ..decorators import login_required
 from ...services.order_processing import start_order_processing_thread
 from ...persistence.process_store import ProcessStore
 
 logger = logging.getLogger(__name__)
 
-# Creamos el Blueprint para las rutas de procesamiento
+# Create the Blueprint for processing routes
 processing_bp = Blueprint(
     'processing',
     __name__,
@@ -47,8 +47,8 @@ processing_bp = Blueprint(
 @login_required
 def index():
     """
-    Muestra la página principal de la aplicación, donde el usuario
-    puede configurar y iniciar un nuevo proceso de obtención de pedidos.
+    Shows the main page of the application, where the user
+    can configure and start a new order retrieval process.
     """
     return render_template('index.html')
 
@@ -57,12 +57,12 @@ def index():
 @login_required
 def start_process():
     """
-    Endpoint API para iniciar un nuevo proceso de fondo.
-    Recoge los datos del formulario, crea un registro de proceso inicial,
-    y lanza el hilo que hará el trabajo pesado.
+    API endpoint to start a new background process.
+    Collects form data, creates an initial process record,
+    and launches the thread that will do the heavy work.
     """
     try:
-        # 1. Recopilar datos del formulario.
+        # 1. Collect form data.
         form_data = {
             'output_files': request.form.getlist('output_files'),
             'include_all_orders': 'include_all_orders' in request.form,
@@ -71,30 +71,30 @@ def start_process():
         }
 
         if not form_data['output_files']:
-            return jsonify({'status': 'error', 'message': 'Debes seleccionar al menos un tipo de archivo a generar.'}), 400
+            return jsonify({'status': 'error', 'message': 'You must select at least one file type to generate.'}), 400
 
-        # --- LÓGICA DE FECHA CORREGIDA ---
-        # Determinar el objeto datetime de inicio (from_dt) aquí, en la capa web.
+        # --- CORRECTED DATE LOGIC ---
+        # Determine the start datetime object (from_dt) here, in the web layer.
         from_dt = None
         from_date_input = form_data.get('from_date_str')
         
         if from_date_input:
-            # El input de fecha de HTML viene como 'YYYY-MM-DD'.
-            # Lo convertimos a un objeto datetime, poniéndolo al inicio del día (medianoche).
+            # HTML date input comes as 'YYYY-MM-DD'.
+            # Convert it to a datetime object, setting it to start of day (midnight).
             from_dt = datetime.strptime(from_date_input, '%Y-%m-%d').replace(tzinfo=timezone.utc)
         else:
-            # Si no se proporciona fecha, usamos el valor por defecto de la configuración.
+            # If no date is provided, use the default value from configuration.
             default_days = current_app.config.get('DEFAULT_ORDER_FETCH_DAYS', 29)
             from_dt = datetime.now(timezone.utc) - timedelta(days=default_days)
         
-        # 2. Crear un ID de proceso único y un directorio temporal.
+        # 2. Create a unique process ID and temporary directory.
         timestamp = datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')
         process_id = f"proc_{timestamp}_{random.randint(1000, 9999)}"
         batch_id = f"batch_{timestamp}"
         temp_dir = os.path.join(current_app.config['OUTPUT_DIR'], 'temp_batches', batch_id)
         os.makedirs(temp_dir, exist_ok=True)
 
-        # 3. Crear el registro de estado inicial para el proceso.
+        # 3. Create the initial status record for the process.
         process_store = ProcessStore(current_app.config['PROCESS_STORE_DIR'])
         initial_info = {
             'process_id': process_id,
@@ -104,18 +104,18 @@ def start_process():
             'batch_id': batch_id,
             'status': 'initializing',
             'progress': 0,
-            'message': 'Inicializando proceso...',
+            'message': 'Initializing process...',
             'start_time_iso': datetime.now(timezone.utc).isoformat(),
             'completion_time_iso': None,
             'generated_files': [],
             'generated_file_paths': {},
             'zip_file': None,
-            # Guardamos la fecha SIEMPRE como un string en formato ISO.
+            # Always save the date as an ISO format string.
             'from_dt_iso': from_dt.isoformat() 
         }
         process_store.update(process_id, initial_info)
         
-        # 4. Lanzar el hilo de fondo.
+        # 4. Launch the background thread.
         app_context = current_app._get_current_object()
         thread = threading.Thread(
             target=start_order_processing_thread,
@@ -125,9 +125,9 @@ def start_process():
         thread.daemon = True
         thread.start()
 
-        logger.info(f"Proceso en segundo plano iniciado por el usuario '{session.get('user_id')}' con ID: {process_id}")
+        logger.info(f"Background process started by user '{session.get('user_id')}' with ID: {process_id}")
         
-        # 5. Devolver una respuesta JSON con el ID del proceso para que el frontend pueda redirigir.
+        # 5. Return a JSON response with the process ID so the frontend can redirect.
         return jsonify({
             'status': 'started',
             'process_id': process_id,
@@ -135,22 +135,22 @@ def start_process():
         })
 
     except Exception as e:
-        logger.error(f"Error al iniciar el proceso: {e}", exc_info=True)
-        return jsonify({'status': 'error', 'message': f'Error inesperado del servidor: {e}'}), 500
+        logger.error(f"Error starting process: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': f'Unexpected server error: {e}'}), 500
 
 @processing_bp.route('/process/progress/<process_id>')
 @login_required
 def show_progress(process_id: str):
     """
-    Muestra la página de "procesando..." que hará polling para obtener el estado.
+    Shows the "processing..." page that will poll for status.
     """
     process_store = ProcessStore(current_app.config['PROCESS_STORE_DIR'])
     info = process_store.get(process_id)
     if not info:
-        flash("El proceso solicitado no fue encontrado o ha expirado.", "warning")
+        flash("The requested process was not found or has expired.", "warning")
         return redirect(url_for('processing.index'))
     
-    # Si el proceso ya está completo, redirigir directamente a los resultados.
+    # If the process is already complete, redirect directly to results.
     if info.get('status') in ['complete', 'error']:
         return redirect(url_for('processing.show_results', process_id=process_id))
 
@@ -161,15 +161,15 @@ def show_progress(process_id: str):
 @login_required
 def get_status(process_id: str):
     """
-    Endpoint API para que el frontend consulte el estado actual de un proceso.
+    API endpoint for the frontend to query the current status of a process.
     """
     process_store = ProcessStore(current_app.config['PROCESS_STORE_DIR'])
     info = process_store.get(process_id)
 
     if not info:
-        return jsonify({'status': 'not_found', 'message': 'Proceso no encontrado.'}), 404
+        return jsonify({'status': 'not_found', 'message': 'Process not found.'}), 404
 
-    # Devolvemos solo la información necesaria para la interfaz de usuario.
+    # Return only the information needed for the user interface.
     response_data = {
         'status': info.get('status', 'unknown'),
         'progress': info.get('progress', 0),
@@ -177,7 +177,7 @@ def get_status(process_id: str):
         'store_progress': info.get('store_progress', {}),
     }
     
-    # Si el proceso ha terminado, incluimos la URL de la página de resultados y archivos generados.
+    # If the process has finished, include the results page URL and generated files.
     if response_data['status'] in ['complete', 'error']:
         response_data['result_url'] = url_for('processing.show_results', process_id=process_id)
         response_data['generated_files'] = info.get('generated_files', [])
@@ -189,24 +189,24 @@ def get_status(process_id: str):
 @login_required
 def show_results(process_id: str):
     """
-    Muestra la página de resultados de un proceso completado o fallido.
+    Shows the results page of a completed or failed process.
     """
     process_store = ProcessStore(current_app.config['PROCESS_STORE_DIR'])
     info = process_store.get(process_id)
     
     if not info:
-        flash("Los datos del proceso no fueron encontrados. Puede que hayan expirado.", "error")
+        flash("Process data was not found. It may have expired.", "error")
         return redirect(url_for('processing.index'))
 
-    # Si el proceso aún está en curso, redirigir a la página de progreso.
+    # If the process is still in progress, redirect to progress page.
     if info.get('status') not in ['complete', 'error']:
-        flash("El proceso aún no ha finalizado. Por favor, espera.", "warning")
+        flash("The process has not finished yet. Please wait.", "warning")
         return redirect(url_for('processing.show_progress', process_id=process_id))
     
     if info.get('status') == 'error':
-        flash(f"El proceso finalizó con un error: {info.get('message', 'Error desconocido')}", 'error')
+        flash(f"The process finished with an error: {info.get('message', 'Unknown error')}", 'error')
 
-    # Guardar en la sesión solo los archivos que realmente existen
+    # Save to session only files that actually exist
     all_file_paths = info.get('generated_file_paths', {})
     existing_file_paths = {name: path for name, path in all_file_paths.items() if os.path.exists(path)}
     
@@ -237,5 +237,5 @@ def clear_temporary_state():
     """Clear temporary session state."""
     session.pop('generated_files', None)
     session.pop('zip_file_path', None)
-    flash('Estado temporal limpiado.', 'info')
+    flash('Temporary state cleared.', 'info')
     return redirect(url_for('processing.index'))

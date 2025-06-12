@@ -1,147 +1,147 @@
 # ebay_processor/services/color_extraction.py
 """
-Servicio de Extracción de Colores de Producto.
+Product Color Extraction Service.
 
-Este servicio se especializa en una tarea compleja: determinar el color de la alfombra
-y el color del ribete (trim) a partir del título de un producto de eBay.
-La lógica está diseñada para manejar una gran variedad de formatos de títulos,
-priorizando contextos explícitos sobre suposiciones.
+This service specializes in a complex task: determining the carpet color
+and trim color from an eBay product title.
+The logic is designed to handle a wide variety of title formats,
+prioritizing explicit contexts over assumptions.
 """
 
 import logging
 import re
 from typing import Tuple
 
-# Importamos las constantes para mantener la consistencia
+# Import constants to maintain consistency
 from ..core.constants import ALLOWED_COLORS, Carpet, Embroidery
 
 logger = logging.getLogger(__name__)
 
 def extract_carpet_and_trim_colors(title: str) -> Tuple[str, str]:
     """
-    Analiza el título de un producto para extraer el color de la alfombra y del ribete.
+    Analyzes a product title to extract carpet and trim colors.
 
-    El proceso sigue un orden de prioridad:
-    1.  Determina si es una alfombra de goma ('Rubber'). Si es así, el color de la alfombra es 'Rubber'.
-    2.  Busca menciones explícitas como "Red Trim" o "Black Carpet". Estas tienen la máxima prioridad.
-    3.  Analiza patrones complejos dentro de corchetes, como "[Color with Color Trim]".
-    4.  Como último recurso, busca colores en el título y los asigna basándose en su posición.
-    5.  Aplica valores por defecto inteligentes si no se encuentra alguno de los colores.
+    The process follows a priority order:
+    1.  Determines if it's a rubber carpet ('Rubber'). If so, carpet color is 'Rubber'.
+    2.  Looks for explicit mentions like "Red Trim" or "Black Carpet". These have maximum priority.
+    3.  Analyzes complex patterns within brackets, like "[Color with Color Trim]".
+    4.  As a last resort, searches for colors in the title and assigns them based on position.
+    5.  Applies intelligent defaults if either color is not found.
 
     Args:
-        title: El título del producto de eBay.
+        title: The eBay product title.
 
     Returns:
-        Una tupla con (carpet_color, trim_color). Ambos son strings capitalizados.
-        Ej: ('Black', 'Red'), ('Grey', 'Grey'), ('Rubber', 'Black').
+        A tuple with (carpet_color, trim_color). Both are capitalized strings.
+        E.g.: ('Black', 'Red'), ('Grey', 'Grey'), ('Rubber', 'Black').
     """
     # -------------------
-    # 1. Inicialización y Limpieza
+    # 1. Initialization and Cleaning
     # -------------------
     if not isinstance(title, str):
-        logger.warning(f"Se recibió un título no válido (tipo: {type(title)}). Usando valores por defecto.")
+        logger.warning(f"Received invalid title (type: {type(title)}). Using defaults.")
         return 'Black', 'Black'
 
     title_lower = title.lower().strip()
     
-    # Valores por defecto que se sobreescribirán si se encuentra algo
+    # Default values that will be overwritten if something is found
     carpet_color = 'Black'
     trim_color = 'Black'
 
     # -------------------
-    # 2. Detección de Goma (Rubber)
+    # 2. Rubber Detection
     # -------------------
-    # Esta es la regla más importante y debe ir primero.
-    # Si es de goma, el color de la alfombra siempre es 'Rubber'.
+    # This is the most important rule and should go first.
+    # If it's rubber, carpet color is always 'Rubber'.
     is_rubber = any(rubber_keyword in title_lower for rubber_keyword in ['rubber', 'rubstd', 'rubhd', '5mm'])
     if is_rubber:
         carpet_color = 'Rubber'
-        # No salimos aún, porque una alfombra de goma puede tener un ribete de color específico.
-        logger.debug(f"Título '{title[:30]}...': Detectado como Goma. Carpet='Rubber'.")
+        # Don't exit yet, because a rubber carpet can have a specific trim color.
+        logger.debug(f"Title '{title[:30]}...': Detected as Rubber. Carpet='Rubber'.")
 
     # -------------------
-    # 3. Búsqueda de Contexto Explícito (Máxima Prioridad)
+    # 3. Explicit Context Search (Maximum Priority)
     # -------------------
-    # Patrones como "Red Trim" o "Blue Carpet" son los más fiables.
-    # Usamos finditer para buscar todas las ocurrencias y nos quedamos con la última,
-    # que suele ser la correcta en títulos complejos.
+    # Patterns like "Red Trim" or "Blue Carpet" are the most reliable.
+    # We use finditer to search for all occurrences and keep the last one,
+    # which is usually correct in complex titles.
     
-    # Buscar "Color Trim" o "Color Edge"
+    # Search for "Color Trim" or "Color Edge"
     explicit_trim_match = re.search(r'\b(' + '|'.join(ALLOWED_COLORS) + r')\s+(trim|edge)\b', title_lower)
     if explicit_trim_match:
         trim_color = explicit_trim_match.group(1).capitalize()
-        logger.debug(f"Título '{title[:30]}...': Encontrado Trim explícito: '{trim_color}'.")
+        logger.debug(f"Title '{title[:30]}...': Found explicit Trim: '{trim_color}'.")
         
-    # Buscar "Color Carpet" (solo si no es de goma)
+    # Search for "Color Carpet" (only if not rubber)
     if not is_rubber:
         explicit_carpet_match = re.search(r'\b(' + '|'.join(ALLOWED_COLORS) + r')\s+carpet\b', title_lower)
         if explicit_carpet_match:
             carpet_color = explicit_carpet_match.group(1).capitalize()
-            logger.debug(f"Título '{title[:30]}...': Encontrado Carpet explícito: '{carpet_color}'.")
+            logger.debug(f"Title '{title[:30]}...': Found explicit Carpet: '{carpet_color}'.")
 
     # -------------------
-    # 4. Análisis de Patrones Complejos (dentro de corchetes)
+    # 4. Complex Pattern Analysis (within brackets)
     # -------------------
-    # Muchos títulos usan corchetes para especificar variaciones.
-    # Ej: "[Black with Red Trim,Does Not Apply]"
+    # Many titles use brackets to specify variations.
+    # E.g.: "[Black with Red Trim,Does Not Apply]"
     bracket_content_match = re.search(r'\[(.*?)\]', title_lower)
     if bracket_content_match:
         content = bracket_content_match.group(1)
         
-        # Patrón: "Color1 with Color2 Trim"
+        # Pattern: "Color1 with Color2 Trim"
         with_trim_pattern = re.search(r'\b(' + '|'.join(ALLOWED_COLORS) + r')\s+with\s+(' + '|'.join(ALLOWED_COLORS) + r')\s+trim\b', content)
         if with_trim_pattern:
-            # Si encontramos este patrón, es muy fiable y sobreescribe lo anterior.
+            # If we find this pattern, it's very reliable and overrides the previous.
             if not is_rubber:
                 carpet_color = with_trim_pattern.group(1).capitalize()
             trim_color = with_trim_pattern.group(2).capitalize()
-            logger.debug(f"Título '{title[:30]}...': Patrón 'with trim' encontrado. Carpet='{carpet_color}', Trim='{trim_color}'.")
+            logger.debug(f"Title '{title[:30]}...': 'with trim' pattern found. Carpet='{carpet_color}', Trim='{trim_color}'.")
 
     # -------------------
-    # 5. Fallback: Búsqueda de Colores sin Contexto
+    # 5. Fallback: Search for Colors without Context
     # -------------------
-    # Si después de todo lo anterior seguimos con los valores por defecto,
-    # buscamos cualquier color mencionado y lo asignamos.
+    # If after all of the above we still have default values,
+    # search for any color mentioned and assign it.
     
-    # Creamos una lista de todos los colores encontrados en el título.
+    # Create a list of all colors found in the title.
     found_colors = [color for color in ALLOWED_COLORS if re.search(r'\b' + color + r'\b', title_lower)]
     
     if found_colors:
-        # Si la alfombra sigue siendo 'Black' por defecto (y no es de goma),
-        # asignamos el primer color encontrado en el título.
+        # If carpet is still 'Black' by default (and not rubber),
+        # assign the first color found in the title.
         if carpet_color == 'Black' and not is_rubber:
-            # Excluimos el color que ya podría estar asignado al trim para evitar duplicados.
+            # Exclude the color that might already be assigned to trim to avoid duplicates.
             available_colors = [c for c in found_colors if c.capitalize() != trim_color]
             if available_colors:
                 carpet_color = available_colors[0].capitalize()
-                logger.debug(f"Título '{title[:30]}...': Fallback asignó Carpet='{carpet_color}'.")
+                logger.debug(f"Title '{title[:30]}...': Fallback assigned Carpet='{carpet_color}'.")
 
     # -------------------
-    # 6. Lógica Final de Defectos Inteligentes
+    # 6. Final Intelligent Defaults Logic
     # -------------------
-    # Si el trim sigue siendo el 'Black' por defecto pero la alfombra tiene un color,
-    # es muy probable que el trim sea del mismo color que la alfombra.
-    # Ej: Título "Red Car Mats" -> Carpet='Red', Trim debería ser 'Red', no 'Black'.
+    # If trim is still the default 'Black' but carpet has a color,
+    # it's very likely that trim is the same color as carpet.
+    # E.g.: Title "Red Car Mats" -> Carpet='Red', Trim should be 'Red', not 'Black'.
     if trim_color == 'Black' and carpet_color not in ['Black', 'Rubber']:
         trim_color = carpet_color
-        logger.debug(f"Título '{title[:30]}...': Defaulting inteligente, Trim igual a Carpet: '{trim_color}'.")
+        logger.debug(f"Title '{title[:30]}...': Intelligent defaulting, Trim same as Carpet: '{trim_color}'.")
         
-    logger.info(f"Título: '{title[:50]}...' -> Extraído: Carpet='{carpet_color}', Trim='{trim_color}'.")
+    logger.info(f"Title: '{title[:50]}...' -> Extracted: Carpet='{carpet_color}', Trim='{trim_color}'.")
     return carpet_color, trim_color
 
 
 def determine_carpet_type(title: str) -> str:
     """
-    Determina el tipo de alfombra (CT65, Velour, Goma) a partir del título.
+    Determines carpet type (CT65, Velour, Rubber) from the title.
 
     Args:
-        title: El título del producto de eBay.
+        title: The eBay product title.
 
     Returns:
-        Un string representando el tipo de alfombra (usando constantes de `Carpet`).
+        A string representing the carpet type (using `Carpet` constants).
     """
     if not isinstance(title, str):
-        return Carpet.STANDARD # Valor por defecto
+        return Carpet.STANDARD # Default value
 
     title_lower = title.lower()
     
@@ -157,18 +157,18 @@ def determine_carpet_type(title: str) -> str:
 
 def determine_embroidery_type(title: str) -> str:
     """
-    Determina el tipo de bordado a partir del título.
+    Determines embroidery type from the title.
 
     Args:
-        title: El título del producto de eBay.
+        title: The eBay product title.
 
     Returns:
-        "Double Stitch" o una cadena vacía (usando constantes de `Embroidery`).
+        "Double Stitch" or an empty string (using `Embroidery` constants).
     """
     if not isinstance(title, str):
-        return Embroidery.NONE # Valor por defecto
+        return Embroidery.NONE # Default value
 
-    # Palabras clave que indican "Double Stitch"
+    # Keywords that indicate "Double Stitch"
     keywords = ["GREYDS", "BLACKDS", "REDS", "BLUEDS", "UPGRADED", "DOUBLE STITCH"]
     
     title_upper = title.upper()

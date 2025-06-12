@@ -1,9 +1,9 @@
 # ebay_processor/utils/string_utils.py
 """
-Módulo de Utilidades de Strings.
+String Utilities Module.
 
-Contiene funciones de ayuda para la manipulación, limpieza, normalización
-y comparación de cadenas de texto.
+Contains helper functions for string manipulation, cleaning, normalization
+and comparison.
 """
 import re
 from difflib import SequenceMatcher
@@ -11,29 +11,29 @@ from typing import Optional
 
 def calculate_similarity(a: Optional[str], b: Optional[str]) -> float:
     """
-    Calcula la ratio de similitud entre dos strings usando SequenceMatcher.
-    La comparación es insensible a mayúsculas/minúsculas.
+    Calculates the similarity ratio between two strings using SequenceMatcher.
+    The comparison is case-insensitive.
 
     Args:
-        a: Primera cadena de texto.
-        b: Segunda cadena de texto.
+        a: First text string.
+        b: Second text string.
 
     Returns:
-        Un float entre 0.0 y 1.0 representando la similitud.
+        A float between 0.0 and 1.0 representing the similarity.
     """
-    # Se convierten a string y a minúsculas para una comparación robusta.
+    # Convert to string and lowercase for robust comparison.
     return SequenceMatcher(None, str(a).lower(), str(b).lower()).ratio()
 
 def normalize_ref_no(ref_no: Optional[str]) -> str:
     """
-    Normaliza un número de referencia (REF NO) eliminando espacios y guiones,
-    y convirtiéndolo a mayúsculas para una comparación consistente.
+    Normalizes a reference number (REF NO) by removing spaces and dashes,
+    and converting to uppercase for consistent comparison.
 
     Args:
-        ref_no: El número de referencia a normalizar.
+        ref_no: The reference number to normalize.
 
     Returns:
-        El número de referencia normalizado.
+        The normalized reference number.
     """
     if not ref_no:
         return ""
@@ -41,13 +41,13 @@ def normalize_ref_no(ref_no: Optional[str]) -> str:
 
 def normalize_make(make: Optional[str]) -> str:
     """
-    Normaliza nombres de fabricantes de coches a un formato estándar.
+    Normalizes car manufacturer names to a standard format.
 
     Args:
-        make: El nombre del fabricante.
+        make: The manufacturer name.
 
     Returns:
-        El nombre del fabricante normalizado y en minúsculas.
+        The normalized manufacturer name in lowercase.
     """
     if not make:
         return ""
@@ -62,7 +62,7 @@ def normalize_make(make: Optional[str]) -> str:
         'mercedes benz': 'mercedes',
         'bmw': 'bmw',
         'landrover': 'land rover',
-        'range rover': 'land rover', # A menudo se usa como marca
+        'range rover': 'land rover', # Often used as a brand
         'alfa': 'alfa romeo',
         'alfa-romeo': 'alfa romeo',
         'chevy': 'chevrolet',
@@ -73,38 +73,38 @@ def normalize_make(make: Optional[str]) -> str:
 
 def normalize_model(model: Optional[str]) -> str:
     """
-    Limpia y normaliza nombres de modelos de coches.
+    Cleans and normalizes car model names.
 
     Args:
-        model: El nombre del modelo.
+        model: The model name.
 
     Returns:
-        El nombre del modelo limpio y normalizado.
+        The cleaned and normalized model name.
     """
     if not model:
         return ""
     
     s = str(model).lower().strip()
-    # Elimina palabras comunes que no aportan valor
+    # Remove common words that don't add value
     s = re.sub(r'\b(car|auto|automobile|vehicle|floor|mats)\b', '', s, flags=re.IGNORECASE)
-    # Elimina caracteres especiales, pero conserva letras, números, espacios y guiones
+    # Remove special characters, but keep letters, numbers, spaces and dashes
     s = re.sub(r'[^\w\s-]', '', s)
-    # Reemplaza múltiples espacios por uno solo
+    # Replace multiple spaces with a single one
     s = re.sub(r'\s+', ' ', s).strip()
     
     return s
 
 def sanitize_for_excel(text: Optional[str]) -> str:
     """
-    Elimina caracteres de control ilegales que pueden corromper un archivo Excel.
+    Removes illegal control characters that can corrupt an Excel file.
 
     Args:
-        text: El texto a sanear.
+        text: The text to sanitize.
 
     Returns:
-        El texto saneado.
+        The sanitized text.
     """
     if text is None:
         return ""
-    # Regex para encontrar caracteres de control excepto tab, newline, etc.
+    # Regex to find control characters except tab, newline, etc.
     return re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F]', '', str(text))

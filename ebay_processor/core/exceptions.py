@@ -1,17 +1,17 @@
 # ebay_processor/core/exceptions.py
 """
-Módulo de Excepciones Personalizadas.
+Custom Exceptions Module.
 
-Define clases de excepción específicas para el dominio de la aplicación.
-Esto permite un manejo de errores más granular y significativo en toda la base de código.
-En lugar de capturar un `ValueError` genérico, podemos capturar un `SKUMatchingError`
-y saber exactamente qué tipo de problema ocurrió.
+Defines application domain-specific exception classes.
+This allows for more granular and meaningful error handling throughout the codebase.
+Instead of catching a generic `ValueError`, we can catch a `SKUMatchingError`
+and know exactly what type of problem occurred.
 """
 
 class OrderProcessingError(Exception):
     """
-    Excepción base para todos los errores relacionados con el procesamiento de órdenes.
-    Permite capturar cualquier error de nuestro dominio con un solo `except`.
+    Base exception for all order processing related errors.
+    Allows catching any error from our domain with a single `except`.
     """
     def __init__(self, message, **kwargs):
         super().__init__(message)
@@ -21,13 +21,13 @@ class OrderProcessingError(Exception):
         base_message = super().__str__()
         if self.details:
             details_str = ", ".join(f"{k}={v}" for k, v in self.details.items())
-            return f"{base_message} (Detalles: {details_str})"
+            return f"{base_message} (Details: {details_str})"
         return base_message
 
 
 class EbayApiError(OrderProcessingError):
     """
-    Se lanza cuando hay un problema durante la comunicación con la API de eBay.
+    Raised when there's a problem during communication with the eBay API.
     """
     def __init__(self, message, store_id=None, api_call=None):
         super().__init__(message, store_id=store_id, api_call=api_call)
@@ -37,7 +37,7 @@ class EbayApiError(OrderProcessingError):
 
 class TokenRefreshError(EbayApiError):
     """
-    Excepción específica para cuando falla la renovación de un token de OAuth2.
+    Specific exception for when OAuth2 token refresh fails.
     """
     def __init__(self, message, store_id):
         super().__init__(message, store_id=store_id, api_call="refresh_token")
@@ -45,7 +45,7 @@ class TokenRefreshError(EbayApiError):
 
 class DataLoadingError(OrderProcessingError):
     """
-    Se lanza cuando hay un problema al cargar archivos de datos de referencia (e.g., ktypemaster3.csv).
+    Raised when there's a problem loading reference data files (e.g., ktypemaster3.csv).
     """
     def __init__(self, message, file_path=None):
         super().__init__(message, file_path=file_path)
@@ -54,8 +54,8 @@ class DataLoadingError(OrderProcessingError):
 
 class InvalidDataFormatError(DataLoadingError):
     """
-    Se lanza cuando un archivo de datos se carga correctamente pero le faltan
-    columnas requeridas o tiene un formato inesperado.
+    Raised when a data file loads successfully but is missing
+    required columns or has an unexpected format.
     """
     def __init__(self, message, file_path=None, missing_columns=None):
         super().__init__(message, file_path=file_path, missing_columns=missing_columns)
@@ -64,8 +64,8 @@ class InvalidDataFormatError(DataLoadingError):
 
 class SKUMatchingError(OrderProcessingError):
     """
-    Se lanza cuando el motor de emparejamiento no puede encontrar una coincidencia
-    o encuentra un estado ambiguo.
+    Raised when the matching engine cannot find a match
+    or encounters an ambiguous state.
     """
     def __init__(self, message, sku=None, product_title=None, order_id=None):
         super().__init__(message, sku=sku, product_title=product_title, order_id=order_id)
@@ -76,7 +76,7 @@ class SKUMatchingError(OrderProcessingError):
 
 class FileGenerationError(OrderProcessingError):
     """
-    Se lanza cuando ocurre un error durante la creación o escritura de un archivo de salida.
+    Raised when an error occurs during output file creation or writing.
     """
     def __init__(self, message, filename=None, sheet_name=None):
         super().__init__(message, filename=filename, sheet_name=sheet_name)
@@ -86,7 +86,7 @@ class FileGenerationError(OrderProcessingError):
 
 class BarcodeGenerationError(OrderProcessingError):
     """
-    Se lanza si ocurre un problema durante la asignación de códigos de barras.
+    Raised if a problem occurs during barcode assignment.
     """
     def __init__(self, message, order_id=None):
         super().__init__(message, order_id=order_id)
@@ -95,7 +95,7 @@ class BarcodeGenerationError(OrderProcessingError):
 
 class ConfigurationError(Exception):
     """
-    Excepción separada para problemas de configuración de la aplicación (e.g., variables de entorno faltantes).
-    No hereda de OrderProcessingError porque suele ocurrir al inicio y no durante el procesamiento.
+    Separate exception for application configuration problems (e.g., missing environment variables).
+    Doesn't inherit from OrderProcessingError because it usually occurs at startup, not during processing.
     """
     pass

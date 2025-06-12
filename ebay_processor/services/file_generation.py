@@ -1,10 +1,10 @@
 # ebay_processor/services/file_generation.py
 """
-Servicio de Generación de Archivos.
+File Generation Service.
 
-Este módulo es responsable de crear todos los archivos de salida, principalmente
-hojas de cálculo de Excel (RUN, COURIER_MASTER, Tracking, etc.).
-Toma datos ya procesados y los formatea según las especificaciones de cada archivo.
+This module is responsible for creating all output files, primarily
+Excel spreadsheets (RUN, COURIER_MASTER, Tracking, etc.).
+Takes already processed data and formats it according to each file's specifications.
 """
 import logging
 import os
@@ -17,7 +17,7 @@ import pandas as pd
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-# Importamos utilidades y constantes del proyecto
+# Import project utilities and constants
 from ..core.constants import (
     HIGHLANDS_AND_ISLANDS_POSTCODES,
     NEXT_DAY_SERVICE_NAME,
@@ -35,24 +35,24 @@ from ..utils.string_utils import sanitize_for_excel
 logger = logging.getLogger(__name__)
 
 
-# --- Funciones Públicas de Generación de Archivos ---
+# --- Public File Generation Functions ---
 
 def generate_consolidated_run_file(
     orders: List[Dict[str, Any]], output_dir: str, run_date: datetime, config: Dict
 ) -> Optional[str]:
     """
-    Genera un único archivo RUN consolidado para pedidos estándar.
+    Generates a single consolidated RUN file for standard orders.
 
     Args:
-        orders: Lista de ítems de pedido estándar.
-        output_dir: Directorio donde se guardará el archivo.
-        run_date: Fecha de la ejecución para el nombre del archivo.
-        config: Diccionario de configuración de la app.
+        orders: List of standard order items.
+        output_dir: Directory where the file will be saved.
+        run_date: Execution date for the filename.
+        config: Application configuration dictionary.
 
     Returns:
-        La ruta al archivo generado o None si no se generó.
+        The path to the generated file or None if not generated.
     """
-    logger.info(f"Generando archivo RUN consolidado para {len(orders)} ítems estándar.")
+    logger.info(f"Generating consolidated RUN file for {len(orders)} standard items.")
     if not orders:
         return None
 
@@ -66,18 +66,18 @@ def generate_run24h_file(
     orders: List[Dict[str, Any]], output_dir: str, run_date: datetime, config: Dict
 ) -> Optional[str]:
     """
-    Genera un único archivo RUN24H consolidado para pedidos urgentes/expedited.
+    Generates a single consolidated RUN24H file for urgent/expedited orders.
 
     Args:
-        orders: Lista de ítems de pedido urgentes.
-        output_dir: Directorio donde se guardará el archivo.
-        run_date: Fecha de la ejecución para el nombre del archivo.
-        config: Diccionario de configuración de la app.
+        orders: List of urgent order items.
+        output_dir: Directory where the file will be saved.
+        run_date: Execution date for the filename.
+        config: Application configuration dictionary.
 
     Returns:
-        La ruta al archivo generado o None si no se generó.
+        The path to the generated file or None if not generated.
     """
-    logger.info(f"Generando archivo RUN24H consolidado para {len(orders)} ítems urgentes.")
+    logger.info(f"Generating consolidated RUN24H file for {len(orders)} urgent items.")
     if not orders:
         return None
 
@@ -91,18 +91,18 @@ def generate_consolidated_courier_master_file(
     all_orders: List[Dict[str, Any]], output_dir: str, run_date: datetime, config: Dict
 ) -> Optional[str]:
     """
-    Genera un único archivo COURIER_MASTER consolidado con una fila por pedido.
+    Generates a single consolidated COURIER_MASTER file with one row per order.
 
     Args:
-        all_orders: Lista de todos los ítems procesados.
-        output_dir: Directorio donde se guardará el archivo.
-        run_date: Fecha de la ejecución para el nombre del archivo.
-        config: Diccionario de configuración de la app.
+        all_orders: List of all processed items.
+        output_dir: Directory where the file will be saved.
+        run_date: Execution date for the filename.
+        config: Application configuration dictionary.
 
     Returns:
-        La ruta al archivo generado o None si no se generó.
+        The path to the generated file or None if not generated.
     """
-    logger.info(f"Generando COURIER_MASTER para un total de {len(all_orders)} ítems.")
+    logger.info(f"Generating COURIER_MASTER for a total of {len(all_orders)} items.")
     if not all_orders:
         return None
         
@@ -122,22 +122,22 @@ def generate_tracking_files(
     all_orders: List[Dict[str, Any]], output_dir: str, run_date: datetime, config: Dict
 ) -> List[str]:
     """
-    Genera múltiples archivos de Tracking: uno consolidado y uno por cada tienda.
-    También genera archivos CSV de demostración para pruebas de carga de tracking.
+    Generates multiple Tracking files: one consolidated and one per store.
+    Also generates demo CSV files for tracking upload testing.
 
     Args:
-        all_orders: Lista de todos los ítems procesados.
-        output_dir: Directorio donde se guardarán los archivos.
-        run_date: Fecha de la ejecución para los nombres de archivo.
-        config: Diccionario de configuración de la app.
+        all_orders: List of all processed items.
+        output_dir: Directory where files will be saved.
+        run_date: Execution date for filenames.
+        config: Application configuration dictionary.
 
     Returns:
-        Una lista de rutas a todos los archivos generados (Excel y CSV).
+        A list of paths to all generated files (Excel and CSV).
     """
-    logger.info("Iniciando la generación de todos los archivos de Tracking.")
+    logger.info("Starting generation of all Tracking files.")
     generated_paths = []
 
-    # 1. Generar archivo de tracking consolidado.
+    # 1. Generate consolidated tracking file.
     consolidated_excel, consolidated_csv = _create_single_tracking_file_with_csv(
         all_orders, output_dir, run_date, config, is_consolidated=True
     )
@@ -146,7 +146,7 @@ def generate_tracking_files(
     if consolidated_csv:
         generated_paths.append(consolidated_csv)
 
-    # 2. Generar archivos de tracking por tienda.
+    # 2. Generate tracking files by store.
     store_groups = _group_items_by_store_id(all_orders)
     for store_id, items in store_groups.items():
         store_excel, store_csv = _create_single_tracking_file_with_csv(
@@ -164,18 +164,18 @@ def generate_unmatched_items_file(
     unmatched_items: List[Dict[str, Any]], output_dir: str, run_date: datetime, config: Dict
 ) -> Optional[str]:
     """
-    Genera un archivo Excel con todos los ítems que no pudieron ser emparejados.
+    Generates an Excel file with all items that couldn't be matched.
 
     Args:
-        unmatched_items: Lista de diccionarios de ítems sin coincidencia.
-        output_dir: Directorio donde se guardará el archivo.
-        run_date: Fecha de la ejecución para el nombre del archivo.
-        config: Diccionario de configuración de la app.
+        unmatched_items: List of dictionaries of unmatched items.
+        output_dir: Directory where the file will be saved.
+        run_date: Execution date for the filename.
+        config: Application configuration dictionary.
 
     Returns:
-        La ruta al archivo generado o None si no había ítems sin coincidencia.
+        The path to the generated file or None if there were no unmatched items.
     """
-    logger.info(f"Generando archivo de ítems no encontrados para {len(unmatched_items)} ítems.")
+    logger.info(f"Generating unmatched items file for {len(unmatched_items)} items.")
     if not unmatched_items:
         return None
     
@@ -183,7 +183,7 @@ def generate_unmatched_items_file(
     return _save_excel_file(unmatched_items, output_dir, filename, UNMATCHED_SHEET_TITLE, config)
 
 
-# --- Funciones de Ayuda Privadas (Lógica de Formato y Guardado) ---
+# --- Private Helper Functions (Formatting and Saving Logic) ---
 
 def _create_single_tracking_file_with_csv(
     orders: List[Dict[str, Any]],
@@ -194,10 +194,10 @@ def _create_single_tracking_file_with_csv(
     store_id: Optional[str] = None,
 ) -> tuple[Optional[str], Optional[str]]:
     """
-    Función de ayuda interna para crear archivos de tracking (Excel y CSV).
+    Internal helper function to create tracking files (Excel and CSV).
     
     Returns:
-        tuple: (excel_path, csv_path) - rutas a los archivos generados o None si no se crearon
+        tuple: (excel_path, csv_path) - paths to generated files or None if not created
     """
     if not orders:
         return None, None
@@ -207,8 +207,8 @@ def _create_single_tracking_file_with_csv(
 
     rows = []
     for order_id, items in order_groups.items():
-        # Para el archivo de tracking, solo necesitamos una fila por pedido,
-        # usando el primer ítem como representativo.
+        # For the tracking file, we only need one row per order,
+        # using the first item as representative.
         representative_item = items[0]
         rows.append(_format_tracking_row(representative_item, order_id))
     
@@ -232,8 +232,8 @@ def _create_single_tracking_file(
     store_id: Optional[str] = None,
 ) -> Optional[str]:
     """
-    Función de ayuda interna para crear un único archivo de tracking (solo Excel).
-    Mantenida para compatibilidad con código existente.
+    Internal helper function to create a single tracking file (Excel only).
+    Maintained for compatibility with existing code.
     """
     excel_path, _ = _create_single_tracking_file_with_csv(
         orders, output_dir, run_date, config, is_consolidated, store_id
@@ -241,7 +241,7 @@ def _create_single_tracking_file(
     return excel_path
 
 def _format_run_row(item: Dict[str, Any]) -> Dict[str, Any]:
-    """Formatea un único ítem para una fila en un archivo RUN."""
+    """Formats a single item for a row in a RUN file."""
     shuffled_add = _shuffle_address(item.get('ADD1'), item.get('ADD2'), item.get('ADD3'), item.get('ADD4'))
     return {
         'FILE NAME': item.get('FILE NAME', ''),
@@ -256,7 +256,7 @@ def _format_run_row(item: Dict[str, Any]) -> Dict[str, Any]:
         'POSTCODE': item.get('POSTCODE', ''),
         'TEL NO': item.get('TEL NO', ''),
         'EMAIL ADDRESS': item.get('EMAIL ADDRESS', ''),
-        'QTY': '1',  # Un archivo RUN siempre es una fila por ítem.
+        'QTY': '1',  # A RUN file is always one row per item.
         'REF NO': str(item.get('REF NO', '')).upper(),
         'TRIM': item.get('TRIM', ''),
         'Thread Colour': 'Matched',
@@ -275,7 +275,7 @@ def _format_run_row(item: Dict[str, Any]) -> Dict[str, Any]:
         'Courier': '',
         'Tracking No': '',
         'Bar Code Type': 'CODE93',
-        'Bar Code': item.get('FinalBarcode', ''), # Usar el barcode final asignado por el BarcodeService
+        'Bar Code': item.get('FinalBarcode', ''), # Use the final barcode assigned by BarcodeService
         'AF': '',
         'Delivery Special Instruction': item.get('Delivery Special Instruction', ''),
         'Link to Template File': '',
@@ -287,15 +287,15 @@ def _format_run_row(item: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 def _format_courier_master_row(first_item: Dict, all_items_in_order: List) -> Dict:
-    """Formatea la fila para el archivo COURIER_MASTER."""
+    """Formats the row for the COURIER_MASTER file."""
     shuffled_add = _shuffle_address(first_item.get('ADD1'), first_item.get('ADD2'), first_item.get('ADD3'), first_item.get('ADD4'))
     postcode = str(first_item.get('POSTCODE', '')).strip().upper()
     
-    # Determinar servicio basado en el código postal.
+    # Determine service based on postcode.
     is_highlands = any(postcode.startswith(prefix) for prefix in HIGHLANDS_AND_ISLANDS_POSTCODES)
     service = STANDARD_SERVICE_NAME if is_highlands else NEXT_DAY_SERVICE_NAME
 
-    # Determinar peso (lógica original)
+    # Determine weight (original logic)
     weight = 15
     if len(all_items_in_order) == 1:
         item = all_items_in_order[0]
@@ -309,7 +309,7 @@ def _format_courier_master_row(first_item: Dict, all_items_in_order: List) -> Di
         'Address_line_2': shuffled_add[1],
         'Address_line_3': shuffled_add[2],
         'Postcode': postcode,
-        'BarCode': first_item.get('FinalBarcode', ''), # Usamos el barcode del primer ítem como representativo del pedido.
+        'BarCode': first_item.get('FinalBarcode', ''), # Use the barcode from the first item as representative of the order.
         'COUNTRY': shuffled_add[3] if len(shuffled_add[3]) <= 3 else 'GB',
         'SERVICE': service,
         'WEIGHT': weight,
@@ -317,7 +317,7 @@ def _format_courier_master_row(first_item: Dict, all_items_in_order: List) -> Di
     }
 
 def _format_tracking_row(item: Dict, order_id: str) -> Dict:
-    """Formatea una fila para un archivo de tracking."""
+    """Formats a row for a tracking file."""
     return {
         'Shipping Status': 'Shipped',
         'Order ID': str(order_id),
@@ -327,14 +327,14 @@ def _format_tracking_row(item: Dict, order_id: str) -> Dict:
         'Transaction ID': str(item.get('Transaction ID', '')),
         'Shipping Carrier Used': 'Hermes',
         'Tracking Number': '',
-        'Barcode': str(order_id), # El "Barcode" en este archivo es el Order ID de eBay
-        'Our_Barcode': item.get('FinalBarcode', ''), # Nuestro barcode interno único
+        'Barcode': str(order_id), # The "Barcode" in this file is the eBay Order ID
+        'Our_Barcode': item.get('FinalBarcode', ''), # Our unique internal barcode
     }
 
 def _generate_filename(
     file_type: str, store_id: Optional[str], current_date: datetime, extension="xlsx", consolidated=False, config=None
 ) -> str:
-    """Generador de nombres de archivo estandarizado."""
+    """Standardized filename generator."""
     date_str = current_date.strftime("%Y%m%d_%H%M")
     if consolidated:
         return f"{file_type}_CONSOLIDATED_{date_str}.{extension}"
@@ -344,7 +344,7 @@ def _generate_filename(
     return f"{file_type}_{store_initial}_{date_str}.{extension}"
 
 def _group_items_by_order_id(items: List[Dict]) -> Dict[str, List[Dict]]:
-    """Agrupa una lista de ítems en un diccionario por su Order ID."""
+    """Groups a list of items into a dictionary by their Order ID."""
     groups = {}
     for item in items:
         order_id = item.get('ORDER ID')
@@ -353,7 +353,7 @@ def _group_items_by_order_id(items: List[Dict]) -> Dict[str, List[Dict]]:
     return groups
 
 def _group_items_by_store_id(items: List[Dict]) -> Dict[str, List[Dict]]:
-    """Agrupa una lista de ítems en un diccionario por su Store ID."""
+    """Groups a list of items into a dictionary by their Store ID."""
     groups = {}
     for item in items:
         store_id = item.get('Store ID')
@@ -362,7 +362,7 @@ def _group_items_by_store_id(items: List[Dict]) -> Dict[str, List[Dict]]:
     return groups
 
 def _shuffle_address(add1, add2, add3, add4) -> List[str]:
-    """Mueve las partes de la dirección para rellenar huecos, asegurando 4 partes."""
+    """Moves address parts to fill gaps, ensuring 4 parts."""
     parts = [p for p in [add1, add2, add3, add4] if p and str(p).strip().lower() not in ('', 'n/a')]
     return (parts + [''] * 4)[:4]
 
@@ -418,11 +418,11 @@ def _save_excel_file(
     has_info_header: bool = False,
 ) -> Optional[str]:
     """
-    Función de ayuda centralizada y robusta para guardar una lista de diccionarios en un archivo Excel.
-    Usa un archivo temporal para una escritura atómica y segura.
+    Centralized and robust helper function to save a list of dictionaries to an Excel file.
+    Uses a temporary file for atomic and safe writing.
     """
     if not rows:
-        logger.warning(f"No hay filas para escribir en el archivo {filename}. Se omitirá la creación.")
+        logger.warning(f"No rows to write to file {filename}. File creation will be skipped.")
         return None
 
     file_path = os.path.join(output_dir, filename)
@@ -431,56 +431,56 @@ def _save_excel_file(
     try:
         wb = openpyxl.Workbook()
         ws = wb.active
-        ws.title = sheet_title[:30]  # Título de hoja con límite de caracteres
+        ws.title = sheet_title[:30]  # Sheet title with character limit
 
-        # Escribir la cabecera opcional #INFO
+        # Write optional #INFO header
         start_row = 1
         if has_info_header:
             ws.cell(row=1, column=1).value = INFO_HEADER_TAG
             start_row = 2
         
-        # Escribir las cabeceras de columna
+        # Write column headers
         headers = list(rows[0].keys())
         for col_idx, header_text in enumerate(headers, 1):
             ws.cell(row=start_row, column=col_idx).value = header_text
 
-        # Columnas que deben ser tratadas como texto para evitar auto-formato de Excel
+        # Columns that should be treated as text to avoid Excel auto-formatting
         text_format_columns = {'Barcode', 'Our_Barcode', 'ORDER ID', 'Item Number', 'Transaction ID', 'POSTCODE', 'TEL NO', 'SKU', 'Bar Code', 'Tracking No'}
 
-        # Escribir las filas de datos
+        # Write data rows
         for row_idx, data_row in enumerate(rows, start_row + 1):
             for col_idx, header in enumerate(headers, 1):
                 cell = ws.cell(row=row_idx, column=col_idx)
-                # Sanear el valor antes de escribirlo
+                # Sanitize the value before writing it
                 value = sanitize_for_excel(data_row.get(header, ''))
                 cell.value = value
-                # Aplicar formato de texto si es una columna crítica
+                # Apply text formatting if it's a critical column
                 if header in text_format_columns:
                     cell.number_format = '@'
 
-        # Ajustar el ancho de las columnas
+        # Adjust column widths
         for col_idx, header in enumerate(headers, 1):
             column_letter = get_column_letter(col_idx)
-            # Calcular el ancho máximo basado en el contenido y la cabecera
+            # Calculate maximum width based on content and header
             max_len = max([len(str(r.get(header, ''))) for r in rows] + [len(header)])
-            adjusted_width = min(max(max_len + 2, 12), 50) # Ancho entre 12 y 50 caracteres
+            adjusted_width = min(max(max_len + 2, 12), 50) # Width between 12 and 50 characters
             ws.column_dimensions[column_letter].width = adjusted_width
         
         wb.save(temp_path)
         shutil.move(temp_path, file_path)
 
-        logger.info(f"Archivo Excel generado exitosamente: {file_path}")
+        logger.info(f"Excel file generated successfully: {file_path}")
         return file_path
 
     except Exception as e:
-        logger.error(f"Fallo al guardar el archivo Excel {filename}: {e}", exc_info=True)
-        # Limpiar el archivo temporal si existe
+        logger.error(f"Failed to save Excel file {filename}: {e}", exc_info=True)
+        # Clean up temporary file if it exists
         if os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
             except OSError:
                 pass
-        raise FileGenerationError(f"No se pudo generar el archivo {filename}", filename=filename) from e
+        raise FileGenerationError(f"Could not generate file {filename}", filename=filename) from e
     finally:
         if 'wb' in locals():
             wb.close()
